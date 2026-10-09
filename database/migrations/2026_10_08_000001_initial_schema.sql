@@ -1,0 +1,721 @@
+-- =====================================================================
+-- Migration 0001: initial schema
+-- Target: MariaDB 10.4+ / MySQL 5.7+ (Hostinger shared hosting)
+-- All DATETIME columns are stored in UTC; the app converts to Asia/Kolkata
+-- for display. Money is stored in whole rupees (INT UNSIGNED).
+-- =====================================================================
+
+SET NAMES utf8mb4;
+SET time_zone = '+00:00';
+
+-- ---------------------------------------------------------------------
+-- USERS & ACCESS
+-- ---------------------------------------------------------------------
+
+CREATE TABLE users (
+    id                        BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    first_name                VARCHAR(80)  NOT NULL,
+    last_name                 VARCHAR(80)  NOT NULL,
+    mobile                    VARCHAR(15)  NOT NULL COMMENT 'E.164 without +, e.g. 919876543210',
+    email                     VARCHAR(191) NULL,
+    password_hash             VARCHAR(255) NULL COMMENT 'password_hash(); NULL for OTP-only accounts',
+    status                    ENUM('active','inactive','blocked','suspended') NOT NULL DEFAULT 'active',
+    status_reason             VARCHAR(255) NULL,
+    mobile_verified_at        DATETIME NULL,
+    email_verified_at         DATETIME NULL,
+    property_limit            INT UNSIGNED NOT NULL DEFAULT 3 COMMENT 'Copied from settings.default_property_limit at registration',
+    property_limit_unlimited  TINYINT(1) NOT NULL DEFAULT 0,
+    last_login_at             DATETIME NULL,
+    login_count               INT UNSIGNED NOT NULL DEFAULT 0,
+    is_demo                   TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = development/demo seed row; purged before production',
+    created_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at                DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at                DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_users_mobile (mobile),
+    UNIQUE KEY uq_users_email (email),
+    KEY idx_users_status (status),
+    KEY idx_users_created (created_at),
+    KEY idx_users_name (first_name, last_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- One account can hold several roles (viewer + owner, or admin).
+CREATE TABLE user_roles (
+    user_id     BIGINT UNSIGNED NOT NULL,
+    role        ENUM('viewer','owner','admin','super_admin') NOT NULL,
+    granted_by  BIGINT UNSIGNED NULL,
+    granted_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, role),
+    KEY idx_user_roles_role (role),
+    CONSTRAINT fk_user_roles_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_user_roles_granted_by FOREIGN KEY (granted_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Tracks logged-in devices so a user/admin can be force-logged-out.
+CREATE TABLE user_sessions (
+    id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id         BIGINT UNSIGNED NOT NULL,
+    session_hash    CHAR(64) NOT NULL COMMENT 'sha256 of PHP session id; raw id never stored',
+    context         ENUM('site','admin') NOT NULL DEFAULT 'site',
+    ip_address      VARCHAR(45) NULL,
+    user_agent      VARCHAR(255) NULL,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_seen_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    revoked_at      DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_sessions_hash (session_hash),
+    KEY idx_user_sessions_user (user_id, revoked_at),
+    CONSTRAINT fk_user_sessions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE password_resets (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id     BIGINT UNSIGNED NOT NULL,
+    token_hash  CHAR(64) NOT NULL COMMENT 'sha256 of the emailed token',
+    expires_at  DATETIME NOT NULL,
+    used_at     DATETIME NULL,
+    ip_address  VARCHAR(45) NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_password_resets_token (token_hash),
+    KEY idx_password_resets_user (user_id),
+    CONSTRAINT fk_password_resets_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE otp_codes (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    channel      ENUM('sms','email') NOT NULL,
+    target       VARCHAR(191) NOT NULL COMMENT 'mobile or email the code was sent to',
+    purpose      ENUM('register','login','reset_password','verify_mobile','verify_email') NOT NULL,
+    code_hash    VARCHAR(255) NOT NULL COMMENT 'password_hash() of the code',
+    attempts     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    expires_at   DATETIME NOT NULL,
+    consumed_at  DATETIME NULL,
+    ip_address   VARCHAR(45) NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_otp_target (target, purpose, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Generic fixed-window rate limiter (login, OTP, enquiry spam, uploads).
+CREATE TABLE rate_limits (
+    bucket      VARCHAR(191) NOT NULL COMMENT 'e.g. login:ip:1.2.3.4 or otp:mobile:9198...',
+    hits        INT UNSIGNED NOT NULL DEFAULT 0,
+    reset_at    DATETIME NOT NULL,
+    PRIMARY KEY (bucket),
+    KEY idx_rate_limits_reset (reset_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE login_activity (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NULL,
+    context      ENUM('site','admin') NOT NULL DEFAULT 'site',
+    event        ENUM('login_success','login_failed','logout','otp_sent','otp_failed','password_reset','locked_out') NOT NULL,
+    identifier   VARCHAR(191) NULL COMMENT 'masked mobile/email that was attempted; never a password',
+    ip_address   VARCHAR(45) NULL,
+    user_agent   VARCHAR(255) NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_login_activity_user (user_id, created_at),
+    KEY idx_login_activity_event (event, created_at),
+    CONSTRAINT fk_login_activity_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- REFERENCE DATA (seeded from Rental flow.xlsx)
+-- ---------------------------------------------------------------------
+
+CREATE TABLE property_categories (
+    id          SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    code        VARCHAR(30) NOT NULL COMMENT 'residential | commercial | industrial',
+    name        VARCHAR(60) NOT NULL,
+    sort_order  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_active   TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_property_categories_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Sub-types. field_profile + unit_label + show_building_name drive which
+-- form fields are shown and validated (see app/Config/property_fields.php).
+CREATE TABLE property_types (
+    id                  SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    category_id         SMALLINT UNSIGNED NOT NULL,
+    code                VARCHAR(40) NOT NULL,
+    name                VARCHAR(60) NOT NULL,
+    field_profile       VARCHAR(30) NOT NULL COMMENT 'residential | commercial | commercial_plot | industrial',
+    unit_label          VARCHAR(30) NOT NULL COMMENT 'Flat No / Bungalow No / Shop No / Office No / Plot No',
+    show_building_name  TINYINT(1) NOT NULL DEFAULT 1,
+    allows_pg           TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order          SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_active           TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_property_types_code (code),
+    KEY idx_property_types_category (category_id, is_active, sort_order),
+    CONSTRAINT fk_property_types_category FOREIGN KEY (category_id) REFERENCES property_categories (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE cities (
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(80) NOT NULL,
+    slug        VARCHAR(100) NOT NULL,
+    state       VARCHAR(80) NULL,
+    is_active   TINYINT(1) NOT NULL DEFAULT 1,
+    sort_order  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_cities_slug (slug),
+    KEY idx_cities_active (is_active, sort_order, name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE localities (
+    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    city_id     INT UNSIGNED NOT NULL,
+    name        VARCHAR(100) NOT NULL,
+    slug        VARCHAR(120) NOT NULL,
+    pincode     VARCHAR(10) NULL,
+    is_active   TINYINT(1) NOT NULL DEFAULT 1,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_localities_city_slug (city_id, slug),
+    KEY idx_localities_city_active (city_id, is_active, name),
+    CONSTRAINT fk_localities_city FOREIGN KEY (city_id) REFERENCES cities (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Facilities and Yes/No features. `scopes` controls which forms show it.
+CREATE TABLE amenities (
+    id          SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    code        VARCHAR(40) NOT NULL,
+    name        VARCHAR(80) NOT NULL,
+    amenity_group ENUM('facility','feature') NOT NULL DEFAULT 'facility' COMMENT 'feature = Yes/No item from the sheet',
+    scopes      SET('residential','commercial','commercial_plot','industrial','pg') NOT NULL,
+    sort_order  SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_active   TINYINT(1) NOT NULL DEFAULT 1,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_amenities_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- PROPERTIES
+-- ---------------------------------------------------------------------
+
+CREATE TABLE properties (
+    id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    owner_id              BIGINT UNSIGNED NULL COMMENT 'NULL = owned by admin/system',
+    created_by            BIGINT UNSIGNED NOT NULL,
+    purpose               ENUM('rent','lease','pg') NOT NULL,
+    category_id           SMALLINT UNSIGNED NOT NULL,
+    type_id               SMALLINT UNSIGNED NOT NULL,
+    status                ENUM('draft','pending','changes_requested','approved','active','paused','rejected','expired','deleted') NOT NULL DEFAULT 'draft',
+    draft_step            TINYINT UNSIGNED NOT NULL DEFAULT 1 COMMENT 'last completed wizard step',
+
+    title                 VARCHAR(150) NOT NULL DEFAULT '',
+    slug                  VARCHAR(180) NOT NULL DEFAULT '' COMMENT 'cosmetic; id is the real identifier',
+    description           TEXT NULL,
+
+    -- address (labels vary by type: Flat No / Shop No / Plot No ...)
+    unit_no               VARCHAR(40)  NULL,
+    building_name         VARCHAR(120) NULL,
+    project_name          VARCHAR(120) NULL,
+    landmark              VARCHAR(150) NULL,
+    address_line          VARCHAR(255) NULL,
+    city_id               INT UNSIGNED NULL,
+    locality_id           INT UNSIGNED NULL,
+    pincode               VARCHAR(10)  NULL,
+
+    -- residential / PG
+    bedrooms              TINYINT UNSIGNED NULL COMMENT 'BHK count, 5 = 5+',
+    bathrooms             TINYINT UNSIGNED NULL,
+    balconies             TINYINT UNSIGNED NULL,
+    furnishing            ENUM('furnished','semi_furnished','unfurnished') NULL,
+    available_from        DATE NULL,
+
+    -- area (commercial / industrial; optional for residential)
+    area_value            DECIMAL(12,2) UNSIGNED NULL,
+    area_unit             ENUM('sqft','sqyd') NULL,
+    area_sqft             DECIMAL(12,2) UNSIGNED NULL COMMENT 'normalised for search/sort',
+
+    -- PG only
+    pg_available_for      ENUM('boys','girls','any') NULL,
+    pg_suitable_for       ENUM('students','professionals','both') NULL,
+
+    -- money (live values; pending increases live in rental_change_history)
+    rent                  INT UNSIGNED NULL COMMENT 'monthly, rupees',
+    security_deposit      INT UNSIGNED NULL,
+    maintenance           INT UNSIGNED NULL COMMENT 'monthly',
+    other_charges         VARCHAR(255) NULL,
+    pending_rent_change_id BIGINT UNSIGNED NULL,
+
+    -- contact shown to enquirers (sheet: Owner Name, Owner Mob No 1/2)
+    contact_name          VARCHAR(120) NULL,
+    contact_mobile_1      VARCHAR(15)  NULL,
+    contact_mobile_2      VARCHAR(15)  NULL,
+    contact_email         VARCHAR(191) NULL,
+
+    -- media
+    cover_media_id        BIGINT UNSIGNED NULL,
+    video_url             VARCHAR(255) NULL COMMENT 'optional YouTube link instead of / in addition to an upload',
+
+    -- admin-only fields
+    is_featured           TINYINT(1) NOT NULL DEFAULT 0,
+    featured_until        DATETIME NULL,
+    display_rank          INT UNSIGNED NOT NULL DEFAULT 1000000 COMMENT '1 = top; 1000000 = unranked',
+    admin_note            VARCHAR(500) NULL,
+    rejection_reason      VARCHAR(500) NULL,
+
+    -- denormalised counters (updated in the same transaction as the event)
+    views_count           INT UNSIGNED NOT NULL DEFAULT 0,
+    shortlists_count      INT UNSIGNED NOT NULL DEFAULT 0,
+    enquiries_count       INT UNSIGNED NOT NULL DEFAULT 0,
+    bookings_count        INT UNSIGNED NOT NULL DEFAULT 0,
+
+    submitted_at          DATETIME NULL,
+    approved_at           DATETIME NULL,
+    approved_by           BIGINT UNSIGNED NULL,
+    published_at          DATETIME NULL,
+    expires_at            DATETIME NULL,
+    is_demo               TINYINT(1) NOT NULL DEFAULT 0,
+    created_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at            DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    deleted_at            DATETIME NULL,
+
+    PRIMARY KEY (id),
+    -- public listing pages: /rent, /pg, /lease ordered by featured, rank, newest
+    KEY idx_prop_listing (status, purpose, is_featured, display_rank, published_at),
+    -- search: purpose + city (+ locality) + budget
+    KEY idx_prop_search_city_rent (status, purpose, city_id, rent),
+    KEY idx_prop_search_locality (status, city_id, locality_id, rent),
+    KEY idx_prop_category (status, category_id, purpose),
+    KEY idx_prop_type (type_id),
+    KEY idx_prop_owner (owner_id, status),
+    KEY idx_prop_created (created_at),
+    KEY idx_prop_expires (status, expires_at),
+    KEY idx_prop_title (title),
+    CONSTRAINT fk_prop_owner     FOREIGN KEY (owner_id)    REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_prop_creator   FOREIGN KEY (created_by)  REFERENCES users (id) ON DELETE RESTRICT,
+    CONSTRAINT fk_prop_approver  FOREIGN KEY (approved_by) REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_prop_category  FOREIGN KEY (category_id) REFERENCES property_categories (id),
+    CONSTRAINT fk_prop_type      FOREIGN KEY (type_id)     REFERENCES property_types (id),
+    CONSTRAINT fk_prop_city      FOREIGN KEY (city_id)     REFERENCES cities (id),
+    CONSTRAINT fk_prop_locality  FOREIGN KEY (locality_id) REFERENCES localities (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AUTO_INCREMENT=10001;
+
+-- One row per property: Google Maps pin + privacy.
+CREATE TABLE property_locations (
+    property_id        BIGINT UNSIGNED NOT NULL,
+    latitude           DECIMAL(10,7) NOT NULL,
+    longitude          DECIMAL(10,7) NOT NULL,
+    public_latitude    DECIMAL(10,7) NOT NULL COMMENT 'equal to latitude when exact; fixed offset when approximate',
+    public_longitude   DECIMAL(10,7) NOT NULL,
+    formatted_address  VARCHAR(255) NULL,
+    google_place_id    VARCHAR(255) NULL,
+    privacy            ENUM('exact','approximate') NOT NULL DEFAULT 'approximate',
+    updated_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (property_id),
+    KEY idx_property_locations_geo (public_latitude, public_longitude),
+    CONSTRAINT fk_property_locations_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Files live under public/uploads/properties/{yyyy}/{mm}/{file_key}_{size}.{ext}
+CREATE TABLE property_media (
+    id             BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    property_id    BIGINT UNSIGNED NOT NULL,
+    media_type     ENUM('image','video') NOT NULL,
+    storage_dir    VARCHAR(40) NOT NULL COMMENT 'e.g. properties/2026/10',
+    file_key       CHAR(32) NOT NULL COMMENT 'random hex; never the user-supplied filename',
+    ext            VARCHAR(5) NOT NULL COMMENT 'jpg | webp | mp4 | webm',
+    has_webp       TINYINT(1) NOT NULL DEFAULT 0,
+    width          SMALLINT UNSIGNED NULL,
+    height         SMALLINT UNSIGNED NULL,
+    size_bytes     INT UNSIGNED NOT NULL DEFAULT 0,
+    mime_type      VARCHAR(50) NOT NULL,
+    original_name  VARCHAR(150) NULL COMMENT 'display only',
+    alt_text       VARCHAR(150) NULL,
+    sort_order     SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_cover       TINYINT(1) NOT NULL DEFAULT 0,
+    status         ENUM('active','deleted') NOT NULL DEFAULT 'active',
+    uploaded_by    BIGINT UNSIGNED NULL,
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at     DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_property_media_key (file_key),
+    KEY idx_property_media_property (property_id, status, media_type, sort_order),
+    CONSTRAINT fk_property_media_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE,
+    CONSTRAINT fk_property_media_uploader FOREIGN KEY (uploaded_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE property_amenities (
+    property_id  BIGINT UNSIGNED NOT NULL,
+    amenity_id   SMALLINT UNSIGNED NOT NULL,
+    PRIMARY KEY (property_id, amenity_id),
+    KEY idx_property_amenities_amenity (amenity_id),
+    CONSTRAINT fk_property_amenities_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE,
+    CONSTRAINT fk_property_amenities_amenity  FOREIGN KEY (amenity_id)  REFERENCES amenities (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- PG "Other services available with extra cost"
+CREATE TABLE property_pg_services (
+    property_id  BIGINT UNSIGNED NOT NULL,
+    service      ENUM('food','laundry','car_washing','other') NOT NULL,
+    price        INT UNSIGNED NULL COMMENT 'monthly extra, rupees; NULL = on request',
+    note         VARCHAR(150) NULL,
+    PRIMARY KEY (property_id, service),
+    CONSTRAINT fk_property_pg_services_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE property_status_history (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    property_id  BIGINT UNSIGNED NOT NULL,
+    old_status   VARCHAR(20) NULL,
+    new_status   VARCHAR(20) NOT NULL,
+    changed_by   BIGINT UNSIGNED NULL,
+    actor_role   ENUM('owner','admin','system') NOT NULL,
+    reason       VARCHAR(500) NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_property_status_history_property (property_id, created_at),
+    CONSTRAINT fk_psh_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE,
+    CONSTRAINT fk_psh_user     FOREIGN KEY (changed_by)  REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Daily view counts (one row per property per day keeps the table small).
+CREATE TABLE property_view_daily (
+    property_id  BIGINT UNSIGNED NOT NULL,
+    view_date    DATE NOT NULL,
+    views        INT UNSIGNED NOT NULL DEFAULT 0,
+    PRIMARY KEY (property_id, view_date),
+    KEY idx_property_view_daily_date (view_date),
+    CONSTRAINT fk_pvd_property FOREIGN KEY (property_id) REFERENCES properties (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- RENT CHANGES & LIMIT REQUESTS
+-- ---------------------------------------------------------------------
+
+CREATE TABLE rental_change_history (
+    id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    property_id      BIGINT UNSIGNED NOT NULL,
+    owner_id         BIGINT UNSIGNED NULL,
+    changed_by       BIGINT UNSIGNED NOT NULL,
+    old_rent         INT UNSIGNED NOT NULL,
+    new_rent         INT UNSIGNED NOT NULL,
+    difference       INT NOT NULL COMMENT 'new - old (negative = decrease)',
+    change_type      ENUM('increase','decrease') NOT NULL,
+    status           ENUM('pending','approved','rejected','auto_applied','cancelled') NOT NULL,
+    -- snapshot at time of change, so the alert stays accurate if details later change
+    property_title   VARCHAR(150) NOT NULL,
+    property_url     VARCHAR(255) NOT NULL,
+    owner_name       VARCHAR(170) NULL,
+    owner_mobile     VARCHAR(15)  NULL,
+    owner_email      VARCHAR(191) NULL,
+    ip_address       VARCHAR(45)  NULL,
+    reviewed_by      BIGINT UNSIGNED NULL,
+    reviewed_at      DATETIME NULL,
+    review_note      VARCHAR(500) NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_rch_status (status, created_at),
+    KEY idx_rch_property (property_id, created_at),
+    KEY idx_rch_owner (owner_id, created_at),
+    CONSTRAINT fk_rch_property FOREIGN KEY (property_id) REFERENCES properties (id),
+    CONSTRAINT fk_rch_owner    FOREIGN KEY (owner_id)    REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_rch_changer  FOREIGN KEY (changed_by)  REFERENCES users (id),
+    CONSTRAINT fk_rch_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE property_limit_requests (
+    id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NOT NULL,
+    current_limit        INT UNSIGNED NOT NULL,
+    current_count        INT UNSIGNED NOT NULL,
+    requested_limit      INT UNSIGNED NULL,
+    requested_unlimited  TINYINT(1) NOT NULL DEFAULT 0,
+    reason               VARCHAR(1000) NOT NULL,
+    status               ENUM('pending','approved','rejected','cancelled') NOT NULL DEFAULT 'pending',
+    approved_limit       INT UNSIGNED NULL,
+    approved_unlimited   TINYINT(1) NOT NULL DEFAULT 0,
+    admin_note           VARCHAR(500) NULL,
+    reviewed_by          BIGINT UNSIGNED NULL,
+    reviewed_at          DATETIME NULL,
+    created_at           DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_plr_status (status, created_at),
+    KEY idx_plr_user (user_id, created_at),
+    CONSTRAINT fk_plr_user     FOREIGN KEY (user_id)     REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_plr_reviewer FOREIGN KEY (reviewed_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- VIEWER ENGAGEMENT
+-- ---------------------------------------------------------------------
+
+CREATE TABLE shortlists (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    property_id  BIGINT UNSIGNED NOT NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_shortlists_user_property (user_id, property_id),
+    KEY idx_shortlists_property (property_id),
+    KEY idx_shortlists_created (created_at),
+    CONSTRAINT fk_shortlists_user     FOREIGN KEY (user_id)     REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_shortlists_property FOREIGN KEY (property_id) REFERENCES properties (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Every enquiry: from a property page (property_id set) or the general
+-- Inquiry Form (property_id NULL). Snapshot columns preserve what the
+-- viewer saw even if rent/title change later.
+CREATE TABLE enquiries (
+    id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    source              ENUM('property_page','general_form') NOT NULL,
+    property_id         BIGINT UNSIGNED NULL,
+    owner_id            BIGINT UNSIGNED NULL,
+    user_id             BIGINT UNSIGNED NULL COMMENT 'logged-in enquirer',
+    first_name          VARCHAR(80)  NOT NULL,
+    last_name           VARCHAR(80)  NOT NULL,
+    mobile_1            VARCHAR(15)  NOT NULL,
+    mobile_2            VARCHAR(15)  NULL,
+    email               VARCHAR(191) NULL,
+    interested_in       ENUM('rent','lease','pg') NULL,
+    category_id         SMALLINT UNSIGNED NULL COMMENT 'Residential / Commercial / Industrial',
+    budget              INT UNSIGNED NULL,
+    city_id             INT UNSIGNED NULL,
+    locality_id         INT UNSIGNED NULL,
+    message             TEXT NULL COMMENT 'Remarks',
+    -- snapshot
+    property_title      VARCHAR(150) NULL,
+    property_url        VARCHAR(255) NULL,
+    owner_name          VARCHAR(170) NULL,
+    rent_at_enquiry     INT UNSIGNED NULL,
+    property_snapshot   TEXT NULL COMMENT 'JSON: purpose, type, bhk, area, city, locality, deposit...',
+    status              ENUM('new','contacted','in_progress','closed') NOT NULL DEFAULT 'new',
+    owner_note          VARCHAR(500) NULL,
+    ip_address          VARCHAR(45) NULL,
+    is_demo             TINYINT(1) NOT NULL DEFAULT 0,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_enquiries_owner (owner_id, status, created_at),
+    KEY idx_enquiries_user (user_id, created_at),
+    KEY idx_enquiries_property (property_id, created_at),
+    KEY idx_enquiries_status (status, created_at),
+    KEY idx_enquiries_mobile (mobile_1),
+    KEY idx_enquiries_created (created_at),
+    CONSTRAINT fk_enquiries_property FOREIGN KEY (property_id) REFERENCES properties (id),
+    CONSTRAINT fk_enquiries_owner    FOREIGN KEY (owner_id)    REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_enquiries_user     FOREIGN KEY (user_id)     REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_enquiries_category FOREIGN KEY (category_id) REFERENCES property_categories (id),
+    CONSTRAINT fk_enquiries_city     FOREIGN KEY (city_id)     REFERENCES cities (id),
+    CONSTRAINT fk_enquiries_locality FOREIGN KEY (locality_id) REFERENCES localities (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Each "Contact Owner" action (enquiry sent, phone number revealed).
+-- Powers the viewer's "Contacted Properties" list and admin analytics.
+CREATE TABLE contact_history (
+    id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id          BIGINT UNSIGNED NOT NULL,
+    property_id      BIGINT UNSIGNED NOT NULL,
+    owner_id         BIGINT UNSIGNED NULL,
+    enquiry_id       BIGINT UNSIGNED NULL,
+    action           ENUM('enquiry','phone_reveal') NOT NULL,
+    rent_at_contact  INT UNSIGNED NULL,
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_contact_history_user (user_id, created_at),
+    KEY idx_contact_history_property (property_id, created_at),
+    KEY idx_contact_history_created (created_at),
+    CONSTRAINT fk_ch_user     FOREIGN KEY (user_id)     REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_ch_property FOREIGN KEY (property_id) REFERENCES properties (id),
+    CONSTRAINT fk_ch_owner    FOREIGN KEY (owner_id)    REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_ch_enquiry  FOREIGN KEY (enquiry_id)  REFERENCES enquiries (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE bookings (
+    id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    property_id       BIGINT UNSIGNED NOT NULL,
+    owner_id          BIGINT UNSIGNED NULL,
+    user_id           BIGINT UNSIGNED NOT NULL,
+    preferred_date    DATE NOT NULL,
+    preferred_time    TIME NOT NULL,
+    message           VARCHAR(1000) NULL,
+    status            ENUM('pending','accepted','rejected','rescheduled','completed','cancelled') NOT NULL DEFAULT 'pending',
+    proposed_date     DATE NULL COMMENT 'set when owner reschedules',
+    proposed_time     TIME NULL,
+    owner_response    VARCHAR(500) NULL,
+    cancelled_by      ENUM('viewer','owner','admin') NULL,
+    property_title    VARCHAR(150) NOT NULL,
+    rent_at_request   INT UNSIGNED NULL,
+    is_demo           TINYINT(1) NOT NULL DEFAULT 0,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_bookings_owner (owner_id, status, created_at),
+    KEY idx_bookings_user (user_id, created_at),
+    KEY idx_bookings_property (property_id, preferred_date),
+    KEY idx_bookings_status (status, created_at),
+    CONSTRAINT fk_bookings_property FOREIGN KEY (property_id) REFERENCES properties (id),
+    CONSTRAINT fk_bookings_owner    FOREIGN KEY (owner_id)    REFERENCES users (id) ON DELETE SET NULL,
+    CONSTRAINT fk_bookings_user     FOREIGN KEY (user_id)     REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE booking_status_history (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    booking_id  BIGINT UNSIGNED NOT NULL,
+    old_status  VARCHAR(20) NULL,
+    new_status  VARCHAR(20) NOT NULL,
+    changed_by  BIGINT UNSIGNED NULL,
+    actor_role  ENUM('viewer','owner','admin','system') NOT NULL,
+    note        VARCHAR(500) NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_bsh_booking (booking_id, created_at),
+    CONSTRAINT fk_bsh_booking FOREIGN KEY (booking_id) REFERENCES bookings (id) ON DELETE CASCADE,
+    CONSTRAINT fk_bsh_user    FOREIGN KEY (changed_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------
+-- SITE CONTENT, NOTIFICATIONS, LOGS, SETTINGS
+-- ---------------------------------------------------------------------
+
+CREATE TABLE homepage_sliders (
+    id            INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    title         VARCHAR(120) NULL,
+    subtitle      VARCHAR(255) NULL,
+    button_text   VARCHAR(40)  NULL,
+    button_link   VARCHAR(255) NULL,
+    image_dir     VARCHAR(40)  NOT NULL,
+    image_key     CHAR(32)     NOT NULL,
+    image_width   SMALLINT UNSIGNED NULL,
+    image_height  SMALLINT UNSIGNED NULL,
+    has_webp      TINYINT(1) NOT NULL DEFAULT 0,
+    sort_order    SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+    is_active     TINYINT(1) NOT NULL DEFAULT 1,
+    starts_at     DATETIME NULL,
+    ends_at       DATETIME NULL,
+    created_by    BIGINT UNSIGNED NULL,
+    created_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_sliders_active (is_active, sort_order),
+    CONSTRAINT fk_sliders_creator FOREIGN KEY (created_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Static pages editable by admin (About, Terms, Privacy, Cookie policy).
+CREATE TABLE cms_pages (
+    id                INT UNSIGNED NOT NULL AUTO_INCREMENT,
+    slug              VARCHAR(100) NOT NULL,
+    title             VARCHAR(150) NOT NULL,
+    body              MEDIUMTEXT NULL,
+    meta_description  VARCHAR(255) NULL,
+    is_published      TINYINT(1) NOT NULL DEFAULT 1,
+    updated_by        BIGINT UNSIGNED NULL,
+    created_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_cms_pages_slug (slug),
+    CONSTRAINT fk_cms_pages_user FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- audience = 'admin' rows are shared by all admins (user_id NULL).
+CREATE TABLE notifications (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    audience     ENUM('user','admin') NOT NULL DEFAULT 'user',
+    user_id      BIGINT UNSIGNED NULL,
+    type         VARCHAR(50) NOT NULL COMMENT 'property_submitted, rent_changed, limit_requested, enquiry_new ...',
+    title        VARCHAR(150) NOT NULL,
+    body         VARCHAR(500) NULL,
+    link_url     VARCHAR(255) NULL COMMENT 'site-relative path only',
+    entity_type  VARCHAR(30) NULL,
+    entity_id    BIGINT UNSIGNED NULL,
+    read_at      DATETIME NULL,
+    read_by      BIGINT UNSIGNED NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_notifications_user (user_id, read_at, created_at),
+    KEY idx_notifications_admin (audience, read_at, created_at),
+    KEY idx_notifications_type (type, created_at),
+    CONSTRAINT fk_notifications_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_notifications_reader FOREIGN KEY (read_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Outgoing email, sent by cron so page requests never wait on SMTP.
+CREATE TABLE email_queue (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    to_email    VARCHAR(191) NOT NULL,
+    to_name     VARCHAR(170) NULL,
+    subject     VARCHAR(200) NOT NULL,
+    body_html   MEDIUMTEXT NOT NULL,
+    body_text   MEDIUMTEXT NULL,
+    status      ENUM('queued','sending','sent','failed') NOT NULL DEFAULT 'queued',
+    attempts    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    last_error  VARCHAR(500) NULL,
+    send_after  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sent_at     DATETIME NULL,
+    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_email_queue_status (status, send_after)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE admin_activity_logs (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    admin_id     BIGINT UNSIGNED NULL,
+    action       VARCHAR(60) NOT NULL COMMENT 'property.status_changed, user.blocked, limit.approved ...',
+    entity_type  VARCHAR(30) NULL,
+    entity_id    BIGINT UNSIGNED NULL,
+    old_values   TEXT NULL COMMENT 'JSON',
+    new_values   TEXT NULL COMMENT 'JSON',
+    ip_address   VARCHAR(45) NULL,
+    user_agent   VARCHAR(255) NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_aal_admin (admin_id, created_at),
+    KEY idx_aal_entity (entity_type, entity_id, created_at),
+    KEY idx_aal_action (action, created_at),
+    CONSTRAINT fk_aal_admin FOREIGN KEY (admin_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Non-admin events (registration, property created, shortlisted, booking...).
+CREATE TABLE activity_logs (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NULL,
+    event        VARCHAR(60) NOT NULL,
+    entity_type  VARCHAR(30) NULL,
+    entity_id    BIGINT UNSIGNED NULL,
+    meta         TEXT NULL COMMENT 'JSON; never passwords, OTPs or tokens',
+    ip_address   VARCHAR(45) NULL,
+    created_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_activity_user (user_id, created_at),
+    KEY idx_activity_event (event, created_at),
+    KEY idx_activity_entity (entity_type, entity_id),
+    CONSTRAINT fk_activity_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Proof of consent; the live choice is in the visitor's cookie.
+CREATE TABLE cookie_consents (
+    id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    consent_id      CHAR(32) NOT NULL COMMENT 'random id also stored in the consent cookie',
+    user_id         BIGINT UNSIGNED NULL,
+    choice          ENUM('all','necessary','custom') NOT NULL,
+    preferences     VARCHAR(255) NULL COMMENT 'JSON {analytics:bool, preferences:bool}',
+    policy_version  SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+    ip_hash         CHAR(64) NULL COMMENT 'sha256(ip + app key); raw IP not kept',
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_cookie_consents_consent (consent_id),
+    CONSTRAINT fk_cookie_consents_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Admin-editable settings (non-secret). Secrets live in config/env.php.
+CREATE TABLE settings (
+    setting_key    VARCHAR(80) NOT NULL,
+    setting_value  TEXT NULL,
+    value_type     ENUM('string','int','bool','json') NOT NULL DEFAULT 'string',
+    setting_group  VARCHAR(40) NOT NULL DEFAULT 'general',
+    label          VARCHAR(120) NOT NULL,
+    description    VARCHAR(255) NULL,
+    updated_by     BIGINT UNSIGNED NULL,
+    updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (setting_key),
+    KEY idx_settings_group (setting_group),
+    CONSTRAINT fk_settings_user FOREIGN KEY (updated_by) REFERENCES users (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

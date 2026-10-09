@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------
+# public_html/.htaccess  (Hostinger / Apache / LiteSpeed)
+# ---------------------------------------------------------------
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Force HTTPS (enable once the free SSL is active in hPanel → Security → SSL)
+    RewriteCond %{HTTPS} !=on
+    RewriteCond %{HTTP:X-Forwarded-Proto} !=https
+    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Block dotfiles (.env, .git ...) except .well-known (SSL validation)
+    RewriteRule (^|/)\.(?!well-known/) - [F,L]
+
+    # Real files (assets, uploads) are served directly; everything else
+    # goes to the front controller.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^ index.php [L,QSA]
+</IfModule>
+
+# Never serve these even if they end up in the web root by mistake
+<FilesMatch "(?i)\.(sql|log|ini|sh|bak|dist|lock|md|json|yml|env)$">
+    Require all denied
+</FilesMatch>
+<Files "robots.txt">
+    Require all granted
+</Files>
+
+# Compression: Brotli where the server has it (LiteSpeed on Hostinger does it
+# automatically), gzip otherwise. Images and video are already compressed.
+<IfModule mod_brotli.c>
+    AddOutputFilterByType BROTLI_COMPRESS text/html text/plain text/css text/xml application/xml application/javascript application/json image/svg+xml
+</IfModule>
+<IfModule mod_deflate.c>
+    AddOutputFilterByType DEFLATE text/html text/plain text/css text/xml application/xml application/javascript application/json image/svg+xml
+</IfModule>
+
+# Browser caching for static assets (asset() adds ?v=mtime so updates bust the cache)
+<IfModule mod_expires.c>
+    ExpiresActive On
+    ExpiresByType image/webp  "access plus 1 year"
+    ExpiresByType image/jpeg  "access plus 1 year"
+    ExpiresByType image/png   "access plus 1 year"
+    ExpiresByType image/svg+xml "access plus 1 year"
+    ExpiresByType video/mp4   "access plus 1 year"
+    ExpiresByType video/webm  "access plus 1 year"
+    ExpiresByType text/css    "access plus 1 year"
+    ExpiresByType application/javascript "access plus 1 year"
+    ExpiresByType font/woff2  "access plus 1 year"
+</IfModule>
+
+<IfModule mod_headers.c>
+    <FilesMatch "\.(webp|jpe?g|png|svg|css|js|woff2|mp4|webm)$">
+        Header set Cache-Control "public, max-age=31536000, immutable"
+    </FilesMatch>
+</IfModule>

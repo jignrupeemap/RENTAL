@@ -1,0 +1,26 @@
+# Uploaded media: serve images/videos only, never execute anything.
+Options -Indexes -ExecCGI
+RemoveHandler .php .phtml .php3 .php4 .php5 .php7 .php8 .phar .pl .py .cgi .sh
+RemoveType .php .phtml .php3 .php4 .php5 .php7 .php8 .phar
+<IfModule mod_php.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php7.c>
+    php_flag engine off
+</IfModule>
+<IfModule mod_php8.c>
+    php_flag engine off
+</IfModule>
+
+# Allow-list of extensions the upload pipeline writes
+<FilesMatch ".*">
+    Require all denied
+</FilesMatch>
+<FilesMatch "(?i)^[a-f0-9]{32}(_[a-z]+)?\.(webp|jpe?g|png|mp4|webm)$">
+    Require all granted
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set Content-Security-Policy "default-src 'none'; img-src 'self'; media-src 'self'; sandbox"
+</IfModule>

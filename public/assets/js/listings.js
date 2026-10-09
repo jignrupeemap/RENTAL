@@ -1,0 +1,93 @@
+/**
+ * Public search pages (Phase 7). Everything here is an enhancement: the
+ * forms work without JavaScript.
+ *  - locality options follow the chosen city; sub-types follow the category
+ *  - the sort menu applies at once
+ *  - the homepage search posts to /rent, /pg or /lease; PG hides non-residential types
+ *  - ❤️ shortlist toggles with fetch() instead of a page reload
+ */
+(function () {
+    'use strict';
+
+    document.querySelectorAll('form').forEach(function (form) {
+        var city = form.querySelector('[data-city-select]');
+        var locality = form.querySelector('[data-locality-select]');
+        if (city && locality) {
+            var syncLocalities = function () {
+                locality.querySelectorAll('optgroup').forEach(function (g) {
+                    var show = city.value === '' || g.getAttribute('data-city') === city.value;
+                    g.hidden = !show;
+                    g.disabled = !show;
+                    if (!show && g.contains(locality.selectedOptions[0])) locality.value = '';
+                });
+            };
+            city.addEventListener('change', syncLocalities);
+            syncLocalities();
+        }
+        var category = form.querySelector('[data-category-select]');
+        var type = form.querySelector('[data-type-select]');
+        if (category && type) {
+            var syncTypes = function () {
+                type.querySelectorAll('option[data-category]').forEach(function (o) {
+                    var show = category.value === '' || o.getAttribute('data-category') === category.value;
+                    o.hidden = !show;
+                    o.disabled = !show;
+                    if (!show && o.selected) type.value = '';
+                });
+            };
+            category.addEventListener('change', syncTypes);
+            syncTypes();
+        }
+    });
+
+    var sortForm = document.querySelector('[data-sort-form]');
+    if (sortForm) {
+        sortForm.querySelector('select').addEventListener('change', function () { sortForm.submit(); });
+    }
+
+    var home = document.querySelector('[data-home-search]');
+    if (home) {
+        var cat = home.querySelector('#hs-category');
+        var syncPurpose = function () {
+            var checked = home.querySelector('input[name="purpose"]:checked');
+            var pg = checked && checked.value === 'pg';
+            cat.querySelectorAll('option[data-pg]').forEach(function (o) {
+                var show = !pg || o.getAttribute('data-pg') === '1';
+                o.hidden = !show;
+                o.disabled = !show;
+                if (!show && o.selected) cat.value = '';
+            });
+        };
+        home.addEventListener('change', function (e) { if (e.target.name === 'purpose') syncPurpose(); });
+        syncPurpose();
+    }
+
+    document.addEventListener('submit', function (e) {
+        var form = e.target;
+        if (!form.classList || !form.classList.contains('js-shortlist') || !window.fetch) return;
+        e.preventDefault();
+        var btn = form.querySelector('button');
+        btn.disabled = true;
+        fetch(form.action, {
+            method: 'POST',
+            body: new FormData(form),
+            headers: { 'X-Requested-With': 'XMLHttpRequest', 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        }).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); })
+          .then(function (res) {
+              if (!res.body.ok) { window.alert(res.body.error || 'Something went wrong. Please try again.'); return; }
+              var on = !!res.body.shortlisted;
+              // Keep every button for this listing on the page in step.
+              document.querySelectorAll('form.js-shortlist[action="' + form.getAttribute('action') + '"]').forEach(function (f) {
+                  var b = f.querySelector('button');
+                  f.querySelector('input[name="state"]').value = on ? 'off' : 'on';
+                  b.classList.toggle('is-on', on);
+                  b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                  b.querySelector('.heart').textContent = on ? '♥' : '♡';
+                  b.querySelector('.label').textContent = on ? 'Shortlisted' : 'Shortlist';
+              });
+          })
+          .catch(function () { form.submit(); })
+          .finally(function () { btn.disabled = false; });
+    });
+})();
