@@ -2,7 +2,7 @@
 /**
  * Homepage (spec 17, 19, 20): the admin-managed hero slider (when any slide
  * is live), then the search card, purpose tiles and listings.
- * @var array $slides @var array $cities @var array $localities @var array $categories @var array $budgets @var array $listings @var array $counts @var array $shortlisted
+ * @var array $slides @var array $cities @var array $localities @var array $categories @var array $budgets @var array $listings @var array $shortlisted
  */
 use App\Services\SliderService;
 $this->layout('layouts/main');
@@ -100,20 +100,6 @@ $many = count($slides) > 1;
 </section>
 
 <div class="container py-4">
-    <div class="row g-3 mb-4">
-        <?php foreach (['rent' => ['Rent', 'Flats, houses, shops and offices'], 'pg' => ['PG', 'Rooms for students and professionals'], 'lease' => ['Lease', 'Commercial and industrial spaces']] as $k => [$l, $sub]): ?>
-            <div class="col-md-4">
-                <a class="purpose-tile card border-0 shadow-sm h-100 text-reset text-decoration-none" href="<?= e(url('/' . $k)) ?>">
-                    <div class="card-body">
-                        <div class="fw-semibold fs-5"><?= $l ?></div>
-                        <div class="small text-muted"><?= e($sub) ?></div>
-                        <div class="small mt-2 text-primary"><?= e(plural((int) $counts[$k], 'property', 'properties')) ?> →</div>
-                    </div>
-                </a>
-            </div>
-        <?php endforeach; ?>
-    </div>
-
     <?php if ($listings): ?>
         <h2 class="h5 mb-3">Featured and latest properties</h2>
         <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
