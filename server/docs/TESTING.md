@@ -56,7 +56,8 @@ Use a real phone as well as a desktop browser. Create two test accounts with you
 ### Posting (spec 7–13, 63)
 - [ ] Post one each of **Rent**, **PG** and **Lease**, covering **Residential**, **Commercial** and **Industrial**. Only fields relevant to the chosen type appear.
 - [ ] Refresh mid-way: the draft is kept. *Save Draft* and *Continue Later* work.
-- [ ] Location step: the map and search appear (with a Maps key), or the coordinate boxes do (without one).
+- [ ] Location step (with a Maps key): search a building or area → the pin moves and empty address boxes, city, locality and pincode fill in. Clicking the map moves the pin; dragging it updates the coordinates. Without a key the coordinate boxes appear instead.
+- [ ] A live listing shows the small map under **Location**: a circle for an approximate pin, a marker for an exact one.
 - [ ] Photos: several images upload, a PDF renamed to `.jpg` is refused, a huge image is refused or resized, a video uploads, and deleting an image works.
 - [ ] The preview looks like the public page → **Submit for Admin Approval** → the status is *Pending*.
 

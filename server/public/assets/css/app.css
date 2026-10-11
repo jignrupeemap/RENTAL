@@ -91,6 +91,9 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
 .service-price { max-width: 12rem; }
 .property-map { height: 340px; border-radius: .5rem; background: #e5e7eb; }
 @media (max-width: 575.98px) { .property-map { height: 280px; } }
+.property-map-sm { height: 280px; }
+@media (max-width: 575.98px) { .property-map-sm { height: 220px; } }
+.place-search gmp-place-autocomplete, .place-search gmp-placeautocomplete { width: 100%; }
 .upload-placeholder, .listing-photo-placeholder { background: #f1f4f6; border: 1px dashed #c7cfd6; }
 .listing-photo-placeholder { aspect-ratio: 16 / 7; display: flex; align-items: center; justify-content: center; }
 .preview-frame { border: 1px solid #e5e7eb; border-radius: .75rem; padding: 1rem; background: #fff; }

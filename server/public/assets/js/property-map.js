@@ -1,0 +1,54 @@
+// Small map on a listing page (public detail, owner preview, admin view).
+// Loads Google Maps only when the map scrolls near the screen, so visitors
+// who never reach it cost no map load. An approximate location is drawn as
+// a shaded circle, an exact one as a pin. If Maps can't load, the map box
+// is removed and the "View on Google Maps" link below it still works.
+(function () {
+    'use strict';
+    var boxes = document.querySelectorAll('[data-property-map]');
+    if (!boxes.length) return;
+    var key = boxes[0].getAttribute('data-maps-key');
+    if (!key) return;
+
+    var hideAll = function () { boxes.forEach(function (b) { b.remove(); }); };
+    window.gm_authFailure = hideAll; // invalid key, or key not allowed on this website
+
+    var draw = function (box) {
+        Promise.all([google.maps.importLibrary('maps'), google.maps.importLibrary('marker')]).then(function (libs) {
+            var at = { lat: parseFloat(box.getAttribute('data-lat')), lng: parseFloat(box.getAttribute('data-lng')) };
+            var exact = box.getAttribute('data-exact') === '1';
+            var opts = {
+                center: at, zoom: exact ? 16 : 15,
+                mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
+                clickableIcons: false, gestureHandling: 'cooperative'
+            };
+            if (exact && !libs[1].Marker) opts.mapId = 'DEMO_MAP_ID';
+            var map = new libs[0].Map(box, opts);
+            if (!exact) {
+                new libs[0].Circle({ map: map, center: at, radius: 500, strokeColor: '#0d6efd', strokeOpacity: 0.6, strokeWeight: 1, fillColor: '#0d6efd', fillOpacity: 0.15, clickable: false });
+            } else if (libs[1].Marker) {
+                new libs[1].Marker({ map: map, position: at });
+            } else {
+                new libs[1].AdvancedMarkerElement({ map: map, position: at });
+            }
+        }).catch(hideAll);
+    };
+
+    var loaded = false;
+    var load = function () {
+        if (loaded) return;
+        loaded = true;
+        window.initListingMap = function () { boxes.forEach(draw); };
+        var s = document.createElement('script');
+        s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&v=weekly&loading=async&language=en&region=IN&callback=initListingMap';
+        s.async = true;
+        s.onerror = hideAll;
+        document.head.appendChild(s);
+    };
+
+    if (!('IntersectionObserver' in window)) { load(); return; }
+    var io = new IntersectionObserver(function (entries) {
+        if (entries.some(function (e) { return e.isIntersecting; })) { io.disconnect(); load(); }
+    }, { rootMargin: '300px' });
+    boxes.forEach(function (b) { io.observe(b); });
+})();

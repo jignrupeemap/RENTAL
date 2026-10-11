@@ -114,6 +114,12 @@ $showStreet = !$public || ($loc['privacy'] ?? '') === 'exact';
         <br><?= e(implode(', ', array_filter([$place, $p['pincode']]))) ?>
     </address>
     <?php if ($loc): ?>
+        <?php if (($mapsKey = maps_browser_key()) !== ''): ?>
+            <div class="property-map property-map-sm mb-2" data-property-map data-maps-key="<?= e($mapsKey) ?>"
+                 data-lat="<?= e((string) $loc['public_latitude']) ?>" data-lng="<?= e((string) $loc['public_longitude']) ?>"
+                 data-exact="<?= $loc['privacy'] === 'exact' ? '1' : '0' ?>" role="region" aria-label="Map of the property area"></div>
+            <script src="<?= e(asset('js/property-map.js')) ?>" defer></script>
+        <?php endif; ?>
         <a class="btn btn-sm btn-outline-primary mb-1" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&amp;query=<?= e($loc['public_latitude'] . ',' . $loc['public_longitude']) ?>">VIEW ON GOOGLE MAPS</a>
         <div class="small text-muted mb-4"><?= $loc['privacy'] === 'exact' ? 'Exact location shown.' : 'Approximate area shown (a few hundred metres from the property).' ?></div>
     <?php else: ?><p class="small text-muted mb-4">Map pin not set.</p><?php endif; ?>

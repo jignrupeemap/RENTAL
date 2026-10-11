@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace App\Controllers\Owner;
 
 use App\Core\Auth;
-use App\Core\Config;
 use App\Core\Database;
 use App\Core\Request;
 use App\Core\Response;
@@ -266,7 +265,7 @@ class PropertyWizardController
         if ($step === 3) {
             $data['cities'] = PropertyForm::cities();
             $data['localities'] = PropertyForm::localities();
-            $data['mapsKey'] = (string) Config::env('GOOGLE_MAPS_BROWSER_KEY', '');
+            $data['mapsKey'] = maps_browser_key();
             $data['defaultPrivacy'] = Settings::get('default_location_privacy', 'approximate') === 'exact' ? 'exact' : 'approximate';
         }
         if ($step === 4) {
