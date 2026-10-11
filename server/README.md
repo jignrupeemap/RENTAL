@@ -77,7 +77,7 @@ cp config/env.example.php config/env.php     # set APP_ENV=development, APP_DEBU
 php -r "echo bin2hex(random_bytes(32));"     # paste as APP_KEY
 php bin/migrate.php                          # creates tables + reference data
 php tests/phase1_schema_check.php            # expect "All Phase 1 checks passed."
-php bin/seed-demo.php                        # optional demo data (development only)
+php bin/seed-demo.php                        # optional demo data: 36 listings with photos (add --allow-production on a live test site)
 php -d upload_max_filesize=64M -d post_max_size=70M -S 127.0.0.1:8088 -t public public/index.php
 php tests/phase2_auth_test.php               # in another terminal; expect "72 passed, 0 failed"
 php tests/phase3_owner_test.php              # expect "60 passed, 0 failed"

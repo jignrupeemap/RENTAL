@@ -157,6 +157,11 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
 .property-card-title a { text-decoration: none; }
 .property-card-title a:hover { text-decoration: underline; }
 .property-card-facts { color: #374151; }
+/* Four cards a row on wide screens: heart-only shortlist button so the
+   actions stay on one line (the label stays for screen readers). */
+.property-card .btn { white-space: nowrap; }
+.property-card .shortlist-btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.property-card .shortlist-btn .heart { font-size: 1rem; line-height: 1; }
 .shortlist-btn .heart { color: #c2410c; }
 .shortlist-btn.is-on { border-color: #c2410c; color: #9a3412; background: #fff7ed; }
 .action-card { position: sticky; top: 5rem; }
