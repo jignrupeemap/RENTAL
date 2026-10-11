@@ -21,7 +21,7 @@ final class HomeController
     {
         $listings = ListingRepository::homepage(8);
         return Response::html(View::render('public/home', [
-            'title'           => (string) Settings::get('site_name', 'Rental Website'),
+            'title'           => (string) Settings::get('site_name', 'Homeforrent'),
             'metaDescription' => (string) Settings::get('site_tagline', '') ?: 'Rent, PG and lease properties listed directly by owners. Search by city, locality, type and budget.',
             'canonical'       => url('/'),
             'slides'          => SliderService::live(),

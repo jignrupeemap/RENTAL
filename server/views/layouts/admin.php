@@ -3,7 +3,7 @@
 use App\Core\Auth;
 use App\Core\Settings;
 use App\Repositories\AdminRepository;
-$siteName = (string) Settings::get('site_name', 'Rental Website');
+$siteName = (string) Settings::get('site_name', 'Homeforrent');
 $admin = Auth::isAdmin() ? Auth::user() : null;
 $section ??= '';
 $alerts = $admin ? AdminRepository::alerts() : [];
@@ -33,6 +33,7 @@ $scripts ??= [];
     <meta name="robots" content="noindex, nofollow">
     <title><?= e(($title ?? 'Admin') . ' | ' . $siteName . ' Admin') ?></title>
     <?php if (\App\Core\Session::isStarted()): ?><meta name="csrf-token" content="<?= e(\App\Core\Csrf::token()) ?>"><?php endif; ?>
+    <?php require APP_ROOT . '/views/partials/brand-head.php'; ?>
     <link rel="stylesheet" href="<?= e(asset('css/bootstrap.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 </head>
@@ -42,7 +43,7 @@ $scripts ??= [];
         <?php if ($admin): ?>
             <button class="btn btn-sm btn-outline-light d-lg-none" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminMenu" aria-controls="adminMenu" aria-label="Open menu">&#9776;</button>
         <?php endif; ?>
-        <a class="navbar-brand mb-0 h1" href="<?= e(url('/admin')) ?>"><?= e($siteName) ?> <span class="badge text-bg-light ms-1">Admin</span></a>
+        <a class="navbar-brand mb-0 h1 d-flex align-items-center" href="<?= e(url('/admin')) ?>"><img class="brand-logo" src="<?= e(asset('img/logo-white.svg')) ?>" alt="<?= e($siteName) ?>" width="144" height="32"> <span class="badge admin-badge ms-2">Admin</span></a>
     </div>
     <?php if ($admin): ?>
         <div class="d-flex align-items-center gap-3">

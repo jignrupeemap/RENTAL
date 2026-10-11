@@ -47,7 +47,7 @@ final class EnquiryService
         }
 
         $owner = $p['owner_id'] !== null ? UserRepository::find((int) $p['owner_id']) : null;
-        $ownerName = $owner !== null ? UserRepository::fullName($owner) : Settings::get('site_name', 'Rental Website');
+        $ownerName = $owner !== null ? UserRepository::fullName($owner) : Settings::get('site_name', 'Homeforrent');
         $snapshot = [
             'purpose' => $p['purpose'], 'category' => $p['category_code'] ?? null, 'type' => $p['type_name'],
             'bedrooms' => $p['bedrooms'], 'area' => $p['area_value'] !== null ? $p['area_value'] . ' ' . $p['area_unit'] : null,
