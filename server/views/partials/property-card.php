@@ -36,7 +36,7 @@ $facts = array_values(array_filter($facts));
         <div class="fw-semibold fs-5 mt-1"><?= e(money_inr($r['rent'] !== null ? (int) $r['rent'] : null)) ?> <span class="fs-6 fw-normal text-muted">/ month</span></div>
         <?php if ($facts): ?><div class="small property-card-facts"><?= e(implode(' | ', $facts)) ?></div><?php endif; ?>
         <div class="d-flex gap-2 mt-auto pt-2">
-            <?php $sid = (int) $r['id']; $son = $on; $sreturn = $return; $sclass = 'btn btn-sm btn-outline-secondary'; require APP_ROOT . '/views/partials/shortlist-button.php'; ?>
+            <?php $sid = (int) $r['id']; $son = $on; $sreturn = $return; $sclass = 'btn btn-sm btn-outline-secondary px-3'; require APP_ROOT . '/views/partials/shortlist-button.php'; ?>
             <a class="btn btn-sm btn-primary ms-auto" href="<?= e($href) ?>">View Details</a>
         </div>
     </div>
