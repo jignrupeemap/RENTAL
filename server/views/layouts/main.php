@@ -2,7 +2,7 @@
 /** @var string $content @var string $title */
 use App\Core\Auth;
 use App\Core\Settings;
-$siteName = (string) Settings::get('site_name', 'Rental Website');
+$siteName = (string) Settings::get('site_name', 'Homeforrent');
 $user = Auth::user();
 $path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
 $active = static fn (string $p): string => ($p === '/' ? $path === '/' : str_starts_with($path, $p)) ? ' active" aria-current="page' : '';
@@ -26,14 +26,15 @@ $active = static fn (string $p): string => ($p === '/' ? $path === '/' : str_sta
     <?php endif; ?>
     <?php if (!empty($jsonLd)): ?><script type="application/ld+json"><?= $jsonLd /* json_encode with JSON_HEX_TAG, safe inside <script> */ ?></script><?php endif; ?>
     <?php if (\App\Core\Session::isStarted()): ?><meta name="csrf-token" content="<?= e(\App\Core\Csrf::token()) ?>"><?php endif; ?>
+    <?php require APP_ROOT . '/views/partials/brand-head.php'; ?>
     <link rel="stylesheet" href="<?= e(asset('css/bootstrap.min.css')) ?>">
     <link rel="stylesheet" href="<?= e(asset('css/app.css')) ?>">
 </head>
 <body class="d-flex flex-column min-vh-100">
-<header class="site-header border-bottom bg-white sticky-top">
+<header class="site-header sticky-top">
     <nav class="navbar navbar-expand-md py-2">
         <div class="container">
-        <a class="navbar-brand brand" href="<?= e(url('/')) ?>"><?= e($siteName) ?></a>
+        <a class="navbar-brand brand" href="<?= e(url('/')) ?>"><img class="brand-logo" src="<?= e(asset('img/logo.svg')) ?>" alt="<?= e($siteName) ?>" width="180" height="40"></a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Menu">
             <span class="navbar-toggler-icon"></span>
         </button>
@@ -43,6 +44,7 @@ $active = static fn (string $p): string => ($p === '/' ? $path === '/' : str_sta
                 <li class="nav-item"><a class="nav-link<?= $active('/rent') ?>" href="<?= e(url('/rent')) ?>">Rent</a></li>
                 <li class="nav-item"><a class="nav-link<?= $active('/pg') ?>" href="<?= e(url('/pg')) ?>">PG</a></li>
                 <li class="nav-item"><a class="nav-link<?= $active('/lease') ?>" href="<?= e(url('/lease')) ?>">Lease</a></li>
+                <li class="nav-item ms-md-2"><a class="btn btn-accent btn-sm px-3" href="<?= e(url('/owner/properties/new')) ?>">Post Property</a></li>
                 <?php if ($user): ?>
                     <li class="nav-item dropdown">
                         <a class="nav-link dropdown-toggle<?= $active('/account') ?>" href="<?= e(url('/account')) ?>" role="button" data-bs-toggle="dropdown" aria-expanded="false">My Account</a>
@@ -64,7 +66,7 @@ $active = static fn (string $p): string => ($p === '/' ? $path === '/' : str_sta
                         </ul>
                     </li>
                 <?php else: ?>
-                    <li class="nav-item ms-md-2"><a class="btn btn-primary btn-sm px-3" href="<?= e(url('/login')) ?>">Login</a></li>
+                    <li class="nav-item ms-md-1"><a class="btn btn-primary btn-sm px-3" href="<?= e(url('/login')) ?>">Login</a></li>
                 <?php endif; ?>
             </ul>
         </div>
@@ -77,14 +79,17 @@ $active = static fn (string $p): string => ($p === '/' ? $path === '/' : str_sta
     <?= $content ?>
 </main>
 
-<footer class="site-footer border-top bg-white mt-5">
-    <div class="container py-4 d-flex flex-column flex-md-row justify-content-between gap-2 small text-muted">
-        <span>&copy; <?= gmdate('Y') ?> <?= e($siteName) ?></span>
-        <span class="d-flex gap-3">
-            <a class="link-secondary" href="<?= e(url('/post-requirement')) ?>">Post your requirement</a>
-            <a class="link-secondary" href="<?= e(url('/page/about')) ?>">About</a>
-            <a class="link-secondary" href="<?= e(url('/page/terms')) ?>">Terms</a>
-            <a class="link-secondary" href="<?= e(url('/page/privacy')) ?>">Privacy</a>
+<footer class="site-footer mt-5">
+    <div class="container py-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 small">
+        <div class="d-flex flex-column gap-2">
+            <a href="<?= e(url('/')) ?>" class="footer-brand"><img src="<?= e(asset('img/logo-white.svg')) ?>" alt="<?= e($siteName) ?>" width="162" height="36" loading="lazy"></a>
+            <span class="footer-muted">&copy; <?= gmdate('Y') ?> <?= e($siteName) ?>. Rent, PG and lease, direct from owners.</span>
+        </div>
+        <span class="d-flex flex-wrap gap-3">
+            <a href="<?= e(url('/post-requirement')) ?>">Post your requirement</a>
+            <a href="<?= e(url('/page/about')) ?>">About</a>
+            <a href="<?= e(url('/page/terms')) ?>">Terms</a>
+            <a href="<?= e(url('/page/privacy')) ?>">Privacy</a>
         </span>
     </div>
 </footer>
