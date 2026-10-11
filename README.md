@@ -1,6 +1,6 @@
 # Rental, PG & Lease Marketplace (PHP + MySQL, Hostinger)
 
-Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Phase notes: [2](docs/PHASE2.md), [3](docs/PHASE3.md), [4](docs/PHASE4.md), [5](docs/PHASE5.md), [6](docs/PHASE6.md), [7](docs/PHASE7.md), [8](docs/PHASE8.md), [9](docs/PHASE9.md), [10](docs/PHASE10.md), [11](docs/PHASE11.md), [12](docs/PHASE12.md), [13](docs/PHASE13.md), [14](docs/PHASE14.md), [15](docs/PHASE15.md) · **[Deploy on Hostinger](docs/DEPLOYMENT.md)** · [Security checklist](docs/SECURITY.md) · [Testing checklist](docs/TESTING.md)
+Design: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · Phase notes: [2](docs/PHASE2.md), [3](docs/PHASE3.md), [4](docs/PHASE4.md), [5](docs/PHASE5.md), [6](docs/PHASE6.md), [7](docs/PHASE7.md), [8](docs/PHASE8.md), [9](docs/PHASE9.md), [10](docs/PHASE10.md), [11](docs/PHASE11.md), [12](docs/PHASE12.md), [13](docs/PHASE13.md), [14](docs/PHASE14.md), [15](docs/PHASE15.md) · **[Deploy on Hostinger](docs/DEPLOYMENT.md)** · [Security checklist](docs/SECURITY.md) · [Testing checklist](docs/TESTING.md) · [Google Maps](docs/GOOGLE-MAPS.md)
 
 ## Phase 15 — Hostinger deployment pack
 

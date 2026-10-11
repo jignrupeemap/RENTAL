@@ -102,7 +102,7 @@ In File Manager, open `rental-app/config/`, **copy** `env.example.php` to `env.p
 | `DB_NAME` / `DB_USER` / `DB_PASSWORD` | From step 3. |
 | `MAIL_*` | Section 4.1. You can finish this after launch. Until then, set `MAIL_DRIVER` to `'smtp'` with your mailbox details, or the readiness check shows "Fix". |
 | `SMS_*` | Leave `SMS_DRIVER` as `'log'` while Mobile OTP is off (the default). Section 4.2. |
-| `GOOGLE_MAPS_BROWSER_KEY` | `''` for now. Section 4.3. |
+| `GOOGLE_MAPS_BROWSER_KEY` | Your Google Maps browser key, or `''` to run without maps. Section 4.3. |
 | `SETUP_TOKEN` | A **temporary** random string of 24+ characters (generate it like `APP_KEY`). It switches on the setup page in step 6. |
 
 Save. **Never** upload `env.php` to GitHub or email it. It is listed in `.gitignore` and is never part of a release zip.
@@ -169,14 +169,16 @@ Mobile OTP verification is **off** by default. To turn it on:
 `SMS_DRIVER => 'log'` only writes codes to a log file and refuses to send in production, so never switch OTP on with it.
 
 ### 4.3 Google Maps
-Until a key is added, owners type latitude/longitude, or leave the map pin out, and listings still show **View on Google Maps**. To enable the map and place search in the posting form:
+With a key, step 3 of the posting form shows a map where the owner **searches a place** (picking a result moves the pin and fills any empty address boxes: building, address, city, locality, pincode), **clicks the map** to drop the pin, or **drags the pin**. Each listing page also shows a small map: a shaded circle for an approximate location, a pin for an exact one. It loads only when the visitor scrolls to it, to keep map loads (and cost) down. Without a key, owners type latitude/longitude and listings show only **View on Google Maps**. To enable it:
 1. Go to [Google Cloud Console](https://console.cloud.google.com/), create a project and attach a billing account. Google's monthly free usage covers a small site.
 2. In **APIs & Services → Library**, enable **Maps JavaScript API** and **Places API (New)**.
 3. In **APIs & Services → Credentials → Create credentials → API key**, set these restrictions:
    - **Application restrictions → Websites**: `https://example.com/*` and `https://www.example.com/*`
    - **API restrictions**: only the two APIs above
 4. Paste the key into `'GOOGLE_MAPS_BROWSER_KEY'` in `env.php`.
-5. Check it: Owner → Add Property → step 3 should show the map and the search box.
+5. Check it: Owner → Add Property → step 3 should show the map and the search box, and a live listing should show the small map under **Location**.
+
+If the map appears but the search box says *Search is not working right now*, **Places API (New)** is not enabled on the key's project (the old "Places API" is not enough). If the map box disappears and a coordinates box opens instead, the key is wrong or this website is not in its allowed list.
 
 The key is visible in the browser by design (it is a *browser* key). The website restriction is what protects it. Never put a server or unrestricted key here.
 

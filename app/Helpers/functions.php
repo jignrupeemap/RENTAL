@@ -32,6 +32,12 @@ function asset(string $path): string
     return url('assets/' . $path) . '?v=' . $v;
 }
 
+/** Google Maps browser key from config/env.php ('' = no maps, coordinates box only). */
+function maps_browser_key(): string
+{
+    return trim((string) App\Core\Config::env('GOOGLE_MAPS_BROWSER_KEY', ''));
+}
+
 /** ₹22,000 style formatting with Indian digit grouping (22,00,000). */
 function money_inr(?int $amount): string
 {

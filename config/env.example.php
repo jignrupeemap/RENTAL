@@ -29,7 +29,11 @@ return [
     'DB_USER'     => '',
     'DB_PASSWORD' => '',
 
-    // Google Maps (Places + Maps JavaScript API). Restrict the key to your domain.
+    // Google Maps browser key: the posting form's map (search a place, drop a pin)
+    // and the small map on each listing. Leave '' to show a coordinates box instead.
+    // In Google Cloud Console enable "Maps JavaScript API" and "Places API (New)",
+    // and restrict the key: Application restrictions → Websites →
+    // https://www.example.com/*  (plus http://127.0.0.1:8088/* while testing).
     'GOOGLE_MAPS_BROWSER_KEY' => '',
 
     // Email. MAIL_DRIVER: smtp (production) | log (development: written to storage/logs/mail-*.log)

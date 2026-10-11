@@ -2,11 +2,11 @@
 /storage/logs/*
 /storage/cache/*
 /storage/tmp/*
+/storage/sessions/*
 !/storage/**/.gitkeep
 /public/uploads/properties/*
 /public/uploads/sliders/*
 !/public/uploads/**/.gitkeep
 /backups/
 .DS_Store
-/storage/sessions/*
 /dist/

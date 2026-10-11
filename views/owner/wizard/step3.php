@@ -1,7 +1,7 @@
 <?php
 /**
- * Step 3: address + map pin. With a Google Maps key the owner searches and
- * drags a pin (assets/js/property-wizard.js keeps the "coordinates" box in
+ * Step 3: address + map pin. With a Google Maps key the owner searches a
+ * place (which fills empty address boxes), clicks the map or drags a pin (assets/js/property-wizard.js keeps the "coordinates" box in
  * sync). Without a key, or if Maps fails to load, they paste coordinates
  * or use their phone's location.
  * @var array $cities @var array $localities @var ?array $location @var string $mapsKey @var string $defaultPrivacy
@@ -65,11 +65,13 @@ $privacy = old('location_privacy', $location['privacy'] ?? $defaultPrivacy);
     <div class="map-block" data-maps-key="<?= e($mapsKey) ?>">
         <?php if ($mapsKey !== ''): ?>
             <div class="mb-2" data-map-search hidden>
-                <label class="form-label small mb-1" for="placeSearch">Search for the building, street or area</label>
-                <div id="placeSearch"></div>
+                <label class="form-label small mb-1" for="placeSearch">Search for the building, society or area</label>
+                <div id="placeSearch" class="place-search"></div>
+                <div class="form-text">Picking a result moves the pin there and fills in any empty address boxes above.</div>
+                <div class="small text-danger mt-1" data-search-error hidden>Search is not working right now. Click the map where the property is instead.</div>
             </div>
-            <div id="propertyMap" class="property-map mb-2" hidden aria-label="Map. Drag the pin to the exact spot."></div>
-            <p class="small text-muted mb-2" data-map-help hidden>Drag the pin to the exact spot of the property.</p>
+            <div id="propertyMap" class="property-map mb-2" hidden aria-label="Map. Click or drag the pin to the exact spot."></div>
+            <p class="small text-muted mb-2" data-map-help hidden>Click the map to drop the pin, then drag it to the exact spot of the property. Zoom in for accuracy.</p>
         <?php endif; ?>
         <details class="mb-2"<?= $mapsKey === '' || field_error('map') ? ' open' : '' ?> data-coords-box>
             <summary class="small"><?= $mapsKey === '' ? 'Location coordinates' : 'Enter coordinates instead' ?></summary>

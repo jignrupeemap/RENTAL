@@ -167,12 +167,15 @@
     });
 
     // ---- Step 3: map pin -------------------------------------------------
+    // Search a place (fills the address boxes), click the map or drag the pin.
+    // The "coordinates" box is what the server reads; the map only keeps it
+    // in sync, so the step still works if Google Maps can't load.
     var block = document.querySelector('.map-block');
     if (!block) return;
     var coords = document.getElementById('f_coordinates');
     var addr = block.querySelector('[data-formatted-address]');
     var placeId = block.querySelector('[data-place-id]');
-    var marker = null, map = null;
+    var map = null, pin = null, markerLib = null;
 
     var parse = function (v) {
         var m = /^\s*(-?\d{1,2}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)\s*$/.exec(v || '');
@@ -182,6 +185,14 @@
         coords.value = lat.toFixed(7).replace(/0+$/, '').replace(/\.$/, '') + ', ' + lng.toFixed(7).replace(/0+$/, '').replace(/\.$/, '');
         coords.classList.remove('is-invalid');
     };
+    // A pin moved by hand no longer matches the searched place.
+    var pinMoved = function (lat, lng) { setCoords(lat, lng); addr.value = ''; placeId.value = ''; };
+    var moveTo = function (ll, zoom) {
+        if (!map) return;
+        if (pin) pin.set(ll); else pin = makePin(markerLib, ll, pinMoved);
+        map.panTo(ll);
+        if (zoom) map.setZoom(zoom);
+    };
 
     block.querySelector('[data-use-my-location]').addEventListener('click', function (e) {
         var btn = e.currentTarget;
@@ -189,11 +200,8 @@
         btn.disabled = true;
         btn.textContent = 'Finding you…';
         navigator.geolocation.getCurrentPosition(function (pos) {
-            setCoords(pos.coords.latitude, pos.coords.longitude);
-            if (marker) {
-                var ll = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-                marker.setPosition(ll); map.setCenter(ll); map.setZoom(17);
-            }
+            pinMoved(pos.coords.latitude, pos.coords.longitude);
+            moveTo({ lat: pos.coords.latitude, lng: pos.coords.longitude }, 18);
             btn.disabled = false;
             btn.textContent = 'Use my current location';
         }, function () {
@@ -202,6 +210,64 @@
         }, { enableHighAccuracy: true, timeout: 15000 });
     });
 
+    // Fill the empty address boxes (and pick city / locality) from a searched place.
+    var norm = function (s) { return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(); };
+    var sameName = function (a, b) {
+        a = norm(a); b = norm(b);
+        return a !== '' && b !== '' && (a === b || a.indexOf(b) === 0 || b.indexOf(a) === 0);
+    };
+    var fillEmpty = function (id, value) {
+        var el = document.getElementById(id);
+        if (el && value && el.value.trim() === '') el.value = value;
+    };
+    var fillAddress = function (place) {
+        var parts = place.addressComponents || [];
+        var get = function (type) {
+            for (var i = 0; i < parts.length; i++) {
+                if ((parts[i].types || []).indexOf(type) !== -1) return parts[i].longText || '';
+            }
+            return '';
+        };
+        var cityEl = document.getElementById('f_city_id');
+        var locEl = document.getElementById('f_locality_id');
+        var pinEl = document.getElementById('f_pincode');
+
+        var postal = get('postal_code');
+        if (pinEl && /^[1-9]\d{5}$/.test(postal)) pinEl.value = postal;
+
+        var cityName = get('locality') || get('administrative_area_level_3') || get('administrative_area_level_2');
+        var area = get('sublocality_level_1') || get('sublocality') || get('neighborhood');
+        if (cityEl && cityName) {
+            var cityOpt = Array.prototype.find.call(cityEl.options, function (o) { return o.value !== '' && sameName(o.text, cityName); });
+            if (cityOpt && cityEl.value !== cityOpt.value) {
+                cityEl.value = cityOpt.value;
+                cityEl.dispatchEvent(new Event('change'));
+            }
+            if (cityOpt && locEl && area) {
+                var group = locEl.querySelector('optgroup[data-city="' + cityOpt.value + '"]');
+                var locOpt = group ? Array.prototype.find.call(group.querySelectorAll('option'), function (o) { return sameName(o.text, area); }) : null;
+                if (locOpt) {
+                    locEl.value = locOpt.value;
+                } else if (locEl.value === '' || locEl.value === 'other') {
+                    locEl.value = 'other';
+                    var nameEl = document.getElementById('f_locality_name');
+                    if (nameEl) nameEl.value = area;
+                }
+                locEl.dispatchEvent(new Event('change'));
+            }
+        }
+
+        var street = [get('subpremise'), get('premise'), [get('street_number'), get('route')].join(' ').trim(),
+            get('sublocality_level_3'), get('sublocality_level_2')].filter(function (s) { return s !== ''; });
+        var types = place.types || [];
+        var isBuilding = types.indexOf('premise') !== -1 || types.indexOf('establishment') !== -1 || types.indexOf('point_of_interest') !== -1;
+        if (isBuilding && place.displayName) {
+            fillEmpty('f_building_name', place.displayName);
+            if (!document.getElementById('f_building_name') && street.indexOf(place.displayName) === -1) street.unshift(place.displayName);
+        }
+        fillEmpty('f_address_line', street.join(', '));
+    };
+
     var key = block.getAttribute('data-maps-key');
     if (!key) return;
 
@@ -209,7 +275,23 @@
         block.querySelectorAll('#propertyMap, [data-map-search], [data-map-help]').forEach(function (el) { el.hidden = true; });
         block.querySelector('[data-coords-box]').open = true;
     };
-    window.gm_authFailure = fallback; // invalid / restricted key
+    window.gm_authFailure = fallback; // invalid key, or key not allowed on this website
+
+    // google.maps.Marker is deprecated; AdvancedMarkerElement replaces it but
+    // needs a map ID. Use whichever this API version offers.
+    var makePin = function (lib, position, onMoved) {
+        if (lib.Marker) {
+            var m = new lib.Marker({ map: map, position: position, draggable: true });
+            m.addListener('dragend', function (ev) { onMoved(ev.latLng.lat(), ev.latLng.lng()); });
+            return { set: function (ll) { m.setPosition(ll); } };
+        }
+        var a = new lib.AdvancedMarkerElement({ map: map, position: position, gmpDraggable: true });
+        a.addListener('dragend', function () {
+            var p = a.position;
+            onMoved(typeof p.lat === 'function' ? p.lat() : p.lat, typeof p.lng === 'function' ? p.lng() : p.lng);
+        });
+        return { set: function (ll) { a.position = ll; } };
+    };
 
     window.initPropertyMap = function () {
         Promise.all([
@@ -221,34 +303,51 @@
             var el = document.getElementById('propertyMap');
             el.hidden = false;
             block.querySelector('[data-map-help]').hidden = false;
-            map = new libs[0].Map(el, {
+            var opts = {
                 center: start || { lat: 21.1702, lng: 72.8311 },
                 zoom: start ? 17 : 12,
-                mapTypeControl: false, streetViewControl: false, fullscreenControl: false
+                mapTypeControl: false, streetViewControl: false, fullscreenControl: true,
+                clickableIcons: false, gestureHandling: 'greedy'
+            };
+            if (!libs[1].Marker) opts.mapId = 'DEMO_MAP_ID';
+            map = new libs[0].Map(el, opts);
+            markerLib = libs[1];
+            // No pin until the owner picks a spot: a pin on the default
+            // city centre would look like a chosen location.
+            if (start) pin = makePin(markerLib, start, pinMoved);
+            map.addListener('click', function (ev) {
+                if (!ev.latLng) return;
+                moveTo(ev.latLng);
+                pinMoved(ev.latLng.lat(), ev.latLng.lng());
             });
-            marker = new libs[1].Marker({ map: map, position: start || map.getCenter(), draggable: true });
-            marker.addListener('dragend', function (ev) { setCoords(ev.latLng.lat(), ev.latLng.lng()); addr.value = ''; placeId.value = ''; });
-            map.addListener('click', function (ev) { marker.setPosition(ev.latLng); setCoords(ev.latLng.lat(), ev.latLng.lng()); addr.value = ''; placeId.value = ''; });
             coords.addEventListener('change', function () {
                 var c = parse(coords.value);
-                if (c) { marker.setPosition(c); map.setCenter(c); map.setZoom(17); }
+                if (c) moveTo(c, 17);
             });
 
             var Auto = libs[2].PlaceAutocompleteElement;
             if (Auto) {
                 var ac = new Auto({ includedRegionCodes: ['in'] });
                 ac.id = 'placeAutocomplete';
+                ac.setAttribute('placeholder', 'e.g. Rajhans Apartments, Adajan, Surat');
                 document.getElementById('placeSearch').appendChild(ac);
-                block.querySelector('[data-map-search]').hidden = false;
+                var search = block.querySelector('[data-map-search]');
+                search.hidden = false;
+                var searchFailed = function () {
+                    var note = block.querySelector('[data-search-error]');
+                    if (note) note.hidden = false;
+                };
+                ac.addEventListener('gmp-error', searchFailed);
+                ac.addEventListener('gmp-requesterror', searchFailed); // older API versions
                 var apply = function (place) {
-                    place.fetchFields({ fields: ['formattedAddress', 'location', 'id'] }).then(function () {
+                    place.fetchFields({ fields: ['formattedAddress', 'location', 'id', 'addressComponents', 'displayName', 'types'] }).then(function () {
                         if (!place.location) return;
-                        map.setCenter(place.location); map.setZoom(17);
-                        marker.setPosition(place.location);
+                        moveTo(place.location, 18);
                         setCoords(place.location.lat(), place.location.lng());
                         addr.value = place.formattedAddress || '';
                         placeId.value = place.id || '';
-                    });
+                        fillAddress(place);
+                    }).catch(searchFailed);
                 };
                 ac.addEventListener('gmp-select', function (ev) { if (ev.placePrediction) apply(ev.placePrediction.toPlace()); });
                 ac.addEventListener('gmp-placeselect', function (ev) { if (ev.place) apply(ev.place); }); // older API versions
@@ -258,7 +357,7 @@
     };
 
     var s = document.createElement('script');
-    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&v=weekly&loading=async&callback=initPropertyMap';
+    s.src = 'https://maps.googleapis.com/maps/api/js?key=' + encodeURIComponent(key) + '&v=weekly&loading=async&language=en&region=IN&callback=initPropertyMap';
     s.async = true;
     s.onerror = fallback;
     document.head.appendChild(s);
