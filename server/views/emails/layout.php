@@ -1,4 +1,4 @@
-<?php /** @var string $content @var string $subject */ $site = (string) App\Core\Settings::get('site_name', 'Rental Website'); ?>
+<?php /** @var string $content @var string $subject */ $site = (string) App\Core\Settings::get('site_name', 'Homeforrent'); ?>
 <!doctype html>
 <html lang="en">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title><?= e($subject) ?></title></head>
