@@ -19,7 +19,7 @@ final class HomeController
     /** Homepage: search card + featured/latest listings (the slider arrives in Phase 11). */
     public function index(Request $request): Response
     {
-        $listings = ListingRepository::homepage(8);
+        $listings = ListingRepository::homepage(12);
         return Response::html(View::render('public/home', [
             'title'           => (string) Settings::get('site_name', 'Homeforrent'),
             'metaDescription' => (string) Settings::get('site_tagline', '') ?: 'Rent, PG and lease properties listed directly by owners. Search by city, locality, type and budget.',
@@ -30,7 +30,6 @@ final class HomeController
             'categories'      => Database::all('SELECT id, code, name FROM property_categories WHERE is_active = 1 ORDER BY sort_order'),
             'budgets'         => ListingRepository::budgets(),
             'listings'        => $listings,
-            'counts'          => ListingRepository::counts(),
             'shortlisted'     => ListingRepository::shortlistedIds(Auth::id(), array_map(static fn ($r) => (int) $r['id'], $listings)),
             'scripts'         => ['js/listings.js'],
         ]));

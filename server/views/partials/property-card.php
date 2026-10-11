@@ -28,6 +28,7 @@ $facts = array_values(array_filter($facts));
             <span class="property-card-noimg">No photo</span>
         <?php endif; ?>
         <?php if ((int) $r['featured_now']): ?><span class="badge featured-badge">Featured</span><?php endif; ?>
+        <span class="badge purpose-badge purpose-<?= e($r['purpose']) ?>"><?= e(purpose_label($r['purpose'])) ?></span>
     </a>
     <div class="card-body d-flex flex-column gap-1 p-3">
         <div class="small text-muted"><?= e($r['type_name']) ?> · <?= e(purpose_label($r['purpose'])) ?></div>
