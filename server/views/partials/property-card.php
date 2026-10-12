@@ -39,10 +39,10 @@ $facts = array_values(array_filter($facts));
     </div>
     </div>
     <div class="card-body d-flex flex-column gap-1 p-3">
-        <div class="small text-muted"><?= e($r['type_name']) ?> · <?= e(purpose_label($r['purpose'])) ?></div>
+        <div class="small property-card-type"><?= e($r['type_name']) ?> · <?= e(purpose_label($r['purpose'])) ?></div>
         <h3 class="h6 mb-0 property-card-title"><a class="text-reset" href="<?= e($href) ?>"><?= e($name) ?></a></h3>
-        <div class="small text-muted"><?= e($place) ?></div>
-        <div class="fw-semibold fs-5 mt-1"><?= e(money_inr($r['rent'] !== null ? (int) $r['rent'] : null)) ?> <span class="fs-6 fw-normal text-muted">/ month</span></div>
+        <div class="small property-card-place"><?= e($place) ?></div>
+        <div class="property-card-price mt-1"><?= e(money_inr($r['rent'] !== null ? (int) $r['rent'] : null)) ?> <span class="per">/ month</span></div>
         <?php if ($facts): ?><div class="small property-card-facts"><?= e(implode(' | ', $facts)) ?></div><?php endif; ?>
         <div class="mt-auto pt-2">
             <a class="btn btn-sm btn-primary w-100" href="<?= e($href) ?>">View Details</a>
