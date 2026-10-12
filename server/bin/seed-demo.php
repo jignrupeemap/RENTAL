@@ -3,7 +3,8 @@ declare(strict_types=1);
 
 /**
  * DEMO data for testing: demo owners/viewers, 35+ active listings (at least
- * 10 each for Rent, PG and Lease, with generated photos) and sample
+ * 10 each for Rent, PG and Lease, with real stock photos downloaded from
+ * Unsplash, or generated pictures when offline) and sample
  * enquiries, bookings and alerts. Every row is flagged is_demo = 1.
  *   php bin/seed-demo.php                     add demo data (development)
  *   php bin/seed-demo.php --allow-production  same on the live site, for testing
@@ -19,6 +20,7 @@ require dirname(__DIR__) . '/app/bootstrap.php';
 
 use App\Core\Config;
 use App\Core\Database;
+use App\Services\Deploy\DemoPhotos;
 use App\Services\Media\ImageProcessor;
 
 $production = Config::isProduction();
@@ -48,111 +50,6 @@ $centres = [
     'udhna' => [21.1700, 72.8400], 'sachin-gidc' => [21.0830, 72.8660], 'pandesara-gidc' => [21.1350, 72.8390], 'hazira' => [21.1100, 72.6500],
 ];
 
-/**
- * Draws a simple, clearly-fake property picture (1200 x 800 JPEG) so demo
- * cards are not empty. $kind: tower | house | shop | shed | room.
- */
-$drawPhoto = static function (string $kind, int $seed, string $caption): string {
-    mt_srand($seed);
-    [$w, $h] = [1200, 800];
-    $im = imagecreatetruecolor($w, $h);
-    $c = static fn (int|float $r, int|float $g, int|float $b): int => imagecolorallocate($im, ...array_map(static fn ($v) => max(0, min(255, (int) $v)), [$r, $g, $b]));
-    $hue = [[47, 111, 143], [58, 134, 120], [150, 96, 70], [120, 84, 140], [70, 110, 160], [160, 120, 60]][mt_rand(0, 5)];
-    $wall = $c(...array_map(static fn ($v) => $v + mt_rand(-15, 15), $hue));
-    $light = $c(236, 240, 244);
-
-    if ($kind === 'room') {
-        // Interior: wall, floor, window, sofa/bed block.
-        imagefilledrectangle($im, 0, 0, $w, 560, $c(232 - mt_rand(0, 20), 226 - mt_rand(0, 20), 214));
-        for ($y = 560; $y < $h; $y++) {
-            imageline($im, 0, $y, $w, $y, $c(170 - ($y - 560) / 6, 130 - ($y - 560) / 8, 95));
-        }
-        imagefilledrectangle($im, 760, 120, 1060, 420, $c(170, 205, 235));
-        imagerectangle($im, 760, 120, 1060, 420, $c(255, 255, 255));
-        imageline($im, 910, 120, 910, 420, $c(255, 255, 255));
-        imagefilledrectangle($im, 140, 420, 620, 600, $wall);
-        imagefilledrectangle($im, 140, 360, 620, 440, $c($hue[0] + 30, $hue[1] + 30, $hue[2] + 30));
-        imagefilledrectangle($im, 260, 140, 480, 300, $c(255, 255, 255));
-        imagefilledrectangle($im, 272, 152, 468, 288, $c($hue[0] + 60, $hue[1] + 50, $hue[2] + 40));
-    } else {
-        // Sky gradient and ground.
-        for ($y = 0; $y < 600; $y++) {
-            imageline($im, 0, $y, $w, $y, $c(120 + $y / 6, 170 + $y / 10, 225));
-        }
-        imagefilledrectangle($im, 0, 600, $w, $h, $c(110, 150, 95));
-        imagefilledrectangle($im, 0, 640, $w, 720, $c(120, 120, 125));
-        for ($x = 0; $x < $w; $x += 120) {
-            imagefilledrectangle($im, $x + 20, 676, $x + 80, 684, $c(235, 235, 235));
-        }
-        $windows = static function (int $x1, int $y1, int $x2, int $y2, int $cols, int $rows) use ($im, $c): void {
-            $cw = ($x2 - $x1) / $cols;
-            $rh = ($y2 - $y1) / $rows;
-            for ($i = 0; $i < $cols; $i++) {
-                for ($j = 0; $j < $rows; $j++) {
-                    $lit = mt_rand(0, 4) === 0;
-                    imagefilledrectangle($im, (int) ($x1 + $i * $cw + $cw * .2), (int) ($y1 + $j * $rh + $rh * .2),
-                        (int) ($x1 + ($i + 1) * $cw - $cw * .2), (int) ($y1 + ($j + 1) * $rh - $rh * .25),
-                        $lit ? $c(250, 225, 150) : $c(185, 215, 240));
-                }
-            }
-        };
-        switch ($kind) {
-            case 'tower':
-                $floors = mt_rand(7, 11);
-                $top = 600 - $floors * 48;
-                imagefilledrectangle($im, 330, $top, 870, 600, $wall);
-                imagefilledrectangle($im, 330, $top - 14, 870, $top, $light);
-                $windows(350, $top + 10, 850, 590, 6, $floors);
-                imagefilledrectangle($im, 900, 360, 1080, 600, $c($hue[0] - 20, $hue[1] - 20, $hue[2] - 20));
-                $windows(910, 370, 1070, 590, 3, 5);
-                break;
-            case 'house':
-                imagefilledrectangle($im, 300, 330, 900, 600, $wall);
-                imagefilledpolygon($im, [270, 340, 600, 160, 930, 340], $c(150, 60, 45));
-                imagefilledrectangle($im, 540, 450, 660, 600, $c(110, 70, 40));
-                $windows(330, 370, 520, 560, 2, 2);
-                $windows(680, 370, 870, 560, 2, 2);
-                imagefilledellipse($im, 1040, 540, 180, 200, $c(60, 120, 60));
-                imagefilledellipse($im, 150, 550, 160, 170, $c(70, 130, 65));
-                break;
-            case 'shop':
-                imagefilledrectangle($im, 200, 260, 1000, 600, $wall);
-                imagefilledrectangle($im, 200, 230, 1000, 260, $light);
-                for ($x = 200; $x < 1000; $x += 80) {
-                    imagefilledrectangle($im, $x, 330, $x + 40, 380, $c(240, 240, 240));
-                    imagefilledrectangle($im, $x + 40, 330, $x + 80, 380, $c(210, 70, 60));
-                }
-                imagefilledrectangle($im, 240, 400, 960, 600, $c(190, 220, 240));
-                imageline($im, 600, 400, 600, 600, $c(90, 90, 90));
-                imagefilledrectangle($im, 360, 275, 840, 320, $c(255, 255, 255));
-                break;
-            default: // shed / warehouse
-                imagefilledrectangle($im, 160, 340, 1040, 600, $c(170, 175, 180));
-                imagefilledpolygon($im, [130, 350, 600, 200, 1070, 350], $wall);
-                for ($x = 170; $x < 1040; $x += 22) {
-                    imageline($im, $x, 350, $x, 600, $c(150, 155, 160));
-                }
-                imagefilledrectangle($im, 300, 430, 520, 600, $c(95, 100, 105));
-                imagefilledrectangle($im, 680, 430, 900, 600, $c(95, 100, 105));
-                break;
-        }
-    }
-
-    // "DEMO" caption, scaled up from GD's built-in font.
-    $text = strtoupper('Demo photo · ' . $caption);
-    $text = preg_replace('/[^\x20-\x7E]/', '-', $text);
-    $tw = imagefontwidth(5) * strlen($text) + 12;
-    $label = imagecreatetruecolor($tw, 24);
-    imagefill($label, 0, 0, imagecolorallocate($label, 20, 30, 40));
-    imagestring($label, 5, 6, 4, $text, imagecolorallocate($label, 255, 255, 255));
-    imagecopyresized($im, $label, 24, $h - 72, 0, 0, $tw * 2, 48, $tw, 24);
-    imagedestroy($label);
-
-    $tmp = tempnam(sys_get_temp_dir(), 'demo');
-    imagejpeg($im, $tmp, 90);
-    imagedestroy($im);
-    return $tmp;
-};
 
 $written = []; // [dir, key] of generated photos, removed again if seeding fails
 $users = [];
@@ -160,7 +57,7 @@ $propIds = [];
 $startedAt = time();
 
 try {
-Database::transaction(function () use ($hash, $type, $locality, $amenity, $centres, $drawPhoto, &$written, &$users, &$propIds, $startedAt): void {
+Database::transaction(function () use ($hash, $type, $locality, $amenity, $centres, &$written, &$users, &$propIds, $startedAt): void {
     foreach ([
         // first, last, mobile, email, roles, unlimited listings
         ['Rahul',  'Patel', '919000000001', 'rahul.demo@example.com',  ['viewer', 'owner'], false],
@@ -233,15 +130,6 @@ Database::transaction(function () use ($hash, $type, $locality, $amenity, $centr
         ['Neha',   'lease', 'office',          'Small Office Space for Startups', 'adajan', $area(600, 'sqft', 'furnished', ['building_name' => 'Silver Business Point']), 30000, ['lift', 'wifi', 'air_conditioning'], false],
     ];
 
-    $kindOf = static fn (string $typeCode): string => match ($typeCode) {
-        'flat' => 'tower',
-        'bungalow', 'farmhouse_villa' => 'house',
-        'office', 'shop', 'showroom', 'restaurant', 'hall', 'house_building', 'hospital', 'school', 'hotel', 'gym' => 'shop',
-        default => 'shed',
-    };
-    $dir = 'properties/' . gmdate('Y/m');
-    $abs = PUBLIC_ROOT . '/uploads/' . $dir;
-
     foreach ($props as $i => [$owner, $purpose, $typeCode, $title, $loc, $extra, $rent, $amenities, $featured]) {
         $t = $type($typeCode);
         $l = $locality($loc);
@@ -277,27 +165,8 @@ Database::transaction(function () use ($hash, $type, $locality, $amenity, $centr
             Database::run('INSERT INTO property_pg_services (property_id, service, price) VALUES (?, "food", 3500), (?, "laundry", 500)', [$pid, $pid]);
         }
 
-        // Two generated photos: outside view (cover) and an inside view.
-        foreach ([$kindOf($typeCode), 'room'] as $n => $kind) {
-            $tmp = $drawPhoto($kind, $pid * 10 + $n, $n === 0 ? $title : 'inside view');
-            $key = bin2hex(random_bytes(16));
-            try {
-                $img = ImageProcessor::process($tmp, 'image/jpeg', $abs, $key);
-            } finally {
-                @unlink($tmp);
-            }
-            $written[] = [$abs, $key];
-            $mid = Database::insert(
-                "INSERT INTO property_media (property_id, media_type, storage_dir, file_key, ext, has_webp, width, height, size_bytes,
-                                             mime_type, original_name, alt_text, sort_order, is_cover, uploaded_by)
-                 VALUES (?, 'image', ?, ?, 'jpg', ?, ?, ?, ?, 'image/jpeg', ?, ?, ?, ?, ?)",
-                [$pid, $dir, $key, $img['has_webp'] ? 1 : 0, $img['width'], $img['height'], $img['size_bytes'],
-                 "demo-{$n}.jpg", $title, $n, $n === 0 ? 1 : 0, $o['id']]
-            );
-            if ($n === 0) {
-                Database::run('UPDATE properties SET cover_media_id = ? WHERE id = ?', [$mid, $pid]);
-            }
-        }
+        // Two photos: outside view (cover) and an inside view.
+        array_push($written, ...DemoPhotos::attach($pid, $typeCode, $title, $o['id'], $i));
         Database::run('INSERT INTO property_status_history (property_id, old_status, new_status, actor_role, reason) VALUES (?, NULL, "active", "system", "demo seed")', [$pid]);
         $propIds[] = $pid;
     }
@@ -341,10 +210,13 @@ Database::transaction(function () use ($hash, $type, $locality, $amenity, $centr
         ImageProcessor::deleteFiles($d, $k);
     }
     throw $e;
+} finally {
+    DemoPhotos::cleanup();
 }
 
 $perPurpose = Database::all('SELECT purpose, COUNT(*) AS n FROM properties WHERE is_demo = 1 GROUP BY purpose ORDER BY purpose');
 echo "Demo data created (flagged is_demo = 1): ", count($propIds), " listings (",
     implode(', ', array_map(static fn ($r) => "{$r['purpose']} {$r['n']}", $perPurpose)), ").\n";
+printf("Photos: %d real, %d generated (download failed).\n", DemoPhotos::$realUsed, DemoPhotos::$drawnUsed);
 echo "Demo logins: mobile 9000000001 to 9000000006, password {$password}\n";
 echo "Remove all of it later with: php bin/purge-demo.php\n";
