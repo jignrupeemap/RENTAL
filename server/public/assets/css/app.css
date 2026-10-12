@@ -1,11 +1,21 @@
 /* Site theme on top of Bootstrap 5. Keep this file small. */
 /* Brand: Homeforrent logo colours (teal house tile + amber "for"). */
+/* Fonts (self-hosted, SIL Open Font License): Inter for the interface,
+   Playfair Display for page headings. Latin subset, variable weight. */
 @font-face {
-    font-family: "Outfit";
+    font-family: "Inter";
     font-style: normal;
-    font-weight: 400 700;
+    font-weight: 100 900;
     font-display: swap;
-    src: url("../fonts/outfit-latin.woff2") format("woff2");
+    src: url("../fonts/inter-latin.woff2") format("woff2");
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+20B9, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: "Playfair Display";
+    font-style: normal;
+    font-weight: 400 900;
+    font-display: swap;
+    src: url("../fonts/playfair-display-latin.woff2") format("woff2");
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 :root {
@@ -19,7 +29,8 @@
     --accent-tint: #fdf1e1;
     --ink: #14302f;
     --ink-soft: #3d5654;
-    --font-brand: "Outfit", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-brand: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-display: "Playfair Display", Georgia, "Times New Roman", serif;
 
     --bs-primary: #0f5c63;
     --bs-primary-rgb: 15, 92, 99;
@@ -35,11 +46,18 @@
     --bs-secondary-color: rgba(20, 48, 47, .68);
     --bs-border-color: #dbe5e3;
     --bs-border-radius: .5rem;
-    --bs-font-sans-serif: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+    --bs-font-sans-serif: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
 }
 h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6, .display-6, .hero-slider-title, .fs-5.fw-semibold {
-    font-family: var(--font-brand); letter-spacing: -.01em; color: inherit;
+    font-family: var(--font-brand); letter-spacing: -.011em; color: inherit;
 }
+/* Page and section headings in the serif display face; small headings,
+   card titles and prices stay in Inter for legibility. :is() lifts
+   specificity so h1.h3 or h2.h5 still get the serif. */
+:is(h1, h2, .h1, .h2, .display-6, .hero-slider-title) {
+    font-family: var(--font-display); font-weight: 600; letter-spacing: 0; font-variant-numeric: lining-nums;
+}
+body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
 .text-muted { color: rgba(20, 48, 47, .62) !important; }
 .btn { font-family: var(--font-brand); font-weight: 500; }
 .btn-primary {
