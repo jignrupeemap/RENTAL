@@ -14,7 +14,9 @@ Added 2026-10-11, after the 15 phases.
 A small map under **Location**, loaded only when it scrolls into view:
 - approximate privacy (default): a 500 m shaded circle around the public point, which is itself 150-400 m from the real spot, so the property is inside it without being pinpointed;
 - exact privacy: a pin.
-If the map can't load, the box is removed and **View on Google Maps** remains.
+If the map can't load, the box is removed. If it loads but its tiles never arrive (a grey box), the browser console (F12) shows a "Listing map:" warning after 15 seconds.
+
+**View on Google Maps** on the public page does not open Google Maps (added 2026-10-12): it shows "Contact/whatsapp on *support phone* for location and more detail", with call and WhatsApp links. The number is the **Support phone** in Admin → Settings → General (migration 0008 sets it to 9925133440 if it was empty). The owner's preview and the admin view keep the real Google Maps link.
 
 ## Setup
 `GOOGLE_MAPS_BROWSER_KEY` in `config/env.php` (never in git or the release zip). Enable **Maps JavaScript API** and **Places API (New)**, and restrict the key to your website. Steps: [DEPLOYMENT.md §4.3](DEPLOYMENT.md#43-google-maps).

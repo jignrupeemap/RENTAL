@@ -120,7 +120,27 @@ $showStreet = !$public || ($loc['privacy'] ?? '') === 'exact';
                  data-exact="<?= $loc['privacy'] === 'exact' ? '1' : '0' ?>" role="region" aria-label="Map of the property area"></div>
             <script src="<?= e(asset('js/property-map.js')) ?>" defer></script>
         <?php endif; ?>
-        <a class="btn btn-sm btn-outline-primary mb-1" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&amp;query=<?= e($loc['public_latitude'] . ',' . $loc['public_longitude']) ?>">VIEW ON GOOGLE MAPS</a>
+        <?php if ($public):
+            // Visitors never get a map link: the button shows who to call or
+            // WhatsApp for the exact location (settings → support_phone).
+            $phone = preg_replace('/\D+/', '', (string) App\Core\Settings::get('support_phone', ''));
+            $phone = strlen($phone) === 12 && str_starts_with($phone, '91') ? substr($phone, 2) : $phone;
+            $waText = 'Hi, I would like the location and more details of property ID ' . (int) $p['id'] . ' on ' . (string) App\Core\Settings::get('site_name', 'Homeforrent') . '.';
+        ?>
+            <button class="btn btn-sm btn-outline-primary mb-1" type="button" data-bs-toggle="collapse" data-bs-target="#locationContact" aria-expanded="false" aria-controls="locationContact">VIEW ON GOOGLE MAPS</button>
+            <div class="collapse" id="locationContact">
+                <div class="alert alert-info small py-2 px-3 mb-2">
+                    <?php if ($phone !== ''): ?>
+                        Contact/whatsapp on <a class="fw-semibold" href="tel:+91<?= e($phone) ?>"><?= e($phone) ?></a> for location and more detail.
+                        <a class="d-inline-block ms-1" href="https://wa.me/91<?= e($phone) ?>?text=<?= e(rawurlencode($waText)) ?>" target="_blank" rel="noopener">Open WhatsApp</a>
+                    <?php else: ?>
+                        Use <strong>Contact Owner</strong> for the location and more detail.
+                    <?php endif; ?>
+                </div>
+            </div>
+        <?php else: ?>
+            <a class="btn btn-sm btn-outline-primary mb-1" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&amp;query=<?= e($loc['public_latitude'] . ',' . $loc['public_longitude']) ?>">VIEW ON GOOGLE MAPS</a>
+        <?php endif; ?>
         <div class="small text-muted mb-4"><?= $loc['privacy'] === 'exact' ? 'Exact location shown.' : 'Approximate area shown (a few hundred metres from the property).' ?></div>
     <?php else: ?><p class="small text-muted mb-4">Map pin not set.</p><?php endif; ?>
 

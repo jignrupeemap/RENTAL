@@ -198,7 +198,8 @@ $g->get($url1);
 check('detail page opens at its SEO URL', $g->status === 200 && $g->has('P7T Vesu 2BHK <b>bold</b>') && !str_contains($g->body, '<b>bold</b>'));
 check('headline, rent, deposit, facts, facilities, map link', $g->has('2 BHK Flat for Rent') && $g->has('₹22,000') && $g->has('Deposit ₹44,000')
     && $g->has('Semi-Furnished') && $g->has('VIEW ON GOOGLE MAPS'));
-check('approximate pin: map link uses the public point', $g->has('query=21.1440000,72.7731000') && !$g->has('21.1418000'));
+check('map button shows the contact message, never a Google Maps link', $g->has('for location and more detail') && $g->has('wa.me/91')
+    && !$g->has('google.com/maps') && !$g->has('21.1418000'));
 check('privacy: no unit number, street, owner name, mobile or email',
     !$g->has('B-1204') && !$g->has('12 Secret Street') && !$g->has('Owner Private') && !$g->has('92222 00799') && !$g->has('919222200799') && !$g->has('private-owner@'));
 check('canonical + og:url', $g->has('<link rel="canonical" href="' . $base . $url1 . '">') && $g->has('property="og:url" content="' . $base . $url1 . '"'));
