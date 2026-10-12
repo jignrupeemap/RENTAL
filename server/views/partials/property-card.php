@@ -15,8 +15,8 @@ $area = $r['area_value'] !== null ? rtrim(rtrim((string) $r['area_value'], '0'),
 $facts = match (true) {
     $r['purpose'] === 'pg' => [$opt('pg_available_for', $r['pg_available_for']) ? 'For ' . $opt('pg_available_for', $r['pg_available_for']) : null,
         $opt('pg_suitable_for', $r['pg_suitable_for']), $opt('furnishing', $r['furnishing'])],
-    // Skip the BHK fact when the title already says it ("3 BHK Flat ...").
-    $r['field_profile'] === 'residential' => [preg_match('/\b\d+\s*\+?\s*(BHK|RK)\b/i', $name) ? null : $opt('bedrooms', $r['bedrooms']), $r['bathrooms'] ? $r['bathrooms'] . ' Bath' : null, $opt('furnishing', $r['furnishing'])],
+    // Homes: the title already says the BHK, so no details line.
+    $r['field_profile'] === 'residential' => [],
     default => [$area, $opt('furnishing', $r['furnishing'])],
 };
 $facts = array_values(array_filter($facts));
