@@ -102,7 +102,7 @@ $many = count($slides) > 1;
 <div class="container py-4">
     <?php if ($listings): ?>
         <h2 class="h5 mb-3">Featured and latest properties</h2>
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3">
+        <div class="row row-cols-2 row-cols-lg-4 g-2 g-md-3">
             <?php foreach ($listings as $i => $r): ?>
                 <div class="col"><?php $on = in_array((int) $r['id'], $shortlisted, true); $return = '/'; $eager = $i < 2; require APP_ROOT . '/views/partials/property-card.php'; ?></div>
             <?php endforeach; ?>

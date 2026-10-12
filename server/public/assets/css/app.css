@@ -318,3 +318,19 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
 .bar-list-track { height: .5rem; background: var(--bs-secondary-bg); border-radius: 1rem; overflow: hidden; }
 .bar-list-fill { height: 100%; background: var(--bs-primary); border-radius: 1rem; }
 .funnel-step { border-left: 3px solid var(--bs-primary); padding-left: .75rem; }
+
+/* Phones: two cards a row, so each card is compact. */
+@media (max-width: 575.98px) {
+    .property-card .card-body { padding: .6rem !important; gap: .15rem !important; }
+    .property-card .card-body .small { font-size: .75rem; }
+    .property-card-title { font-size: .85rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .property-card .fs-5 { font-size: 1rem !important; }
+    .property-card .fs-5 .fs-6 { font-size: .7rem !important; }
+    .property-card-facts { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .property-card .btn-primary { font-size: .8rem; padding: .3rem .4rem; }
+    .property-card-tags { top: .35rem; left: .35rem; gap: .2rem; flex-wrap: wrap; max-width: calc(100% - 2.6rem); }
+    .property-card-tags .badge { font-size: .6rem; padding: .25em .45em; }
+    .property-card-like { top: .3rem; right: .3rem; }
+    .property-card-like .shortlist-btn { width: 1.9rem; height: 1.9rem; }
+    .property-card-like .shortlist-btn .heart { font-size: 1rem; }
+}

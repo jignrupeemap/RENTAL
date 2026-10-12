@@ -137,7 +137,7 @@ $opts = static fn (string $k): array => PropertyForm::options($k);
             </form>
 
             <?php if ($rows): ?>
-                <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 g-3">
+                <div class="row row-cols-2 row-cols-lg-3 row-cols-xl-4 g-2 g-md-3">
                     <?php foreach ($rows as $i => $r): ?>
                         <div class="col"><?php $on = in_array((int) $r['id'], $shortlisted, true); $return = $here; $eager = $i < 3; require APP_ROOT . '/views/partials/property-card.php'; ?></div>
                     <?php endforeach; ?>
