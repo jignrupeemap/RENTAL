@@ -241,9 +241,15 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
 .property-card-media img { object-fit: cover; }
 .property-card-media picture { display: block; width: 100%; height: 100%; }
 .property-card-noimg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #8a96a3; font-size: .875rem; }
-.featured-badge { position: absolute; top: .6rem; left: .6rem; background: var(--accent) !important; color: var(--ink) !important; }
-/* Rent / PG / Lease tag on the card photo, top right. */
-.purpose-badge { position: absolute; top: .6rem; right: .6rem; color: #fff; font-weight: 600; letter-spacing: .02em; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+.featured-badge { background: var(--accent) !important; color: var(--ink) !important; }
+/* On the card photo: Rent / PG / Lease tag (+ Featured) top left, shortlist heart top right. */
+.property-card-top { position: relative; }
+.property-card-tags { position: absolute; top: .6rem; left: .6rem; display: flex; gap: .35rem; }
+.property-card-like { position: absolute; top: .5rem; right: .5rem; }
+.property-card-like .shortlist-btn { width: 2.25rem; height: 2.25rem; padding: 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,.92); border: 0; box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+.property-card-like .shortlist-btn .heart { font-size: 1.15rem; }
+.property-card-like .shortlist-btn.is-on { background: #fff7ed; }
+.purpose-badge { color: #fff; font-weight: 600; letter-spacing: .02em; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .purpose-badge.purpose-rent { background: var(--bs-primary); }
 .purpose-badge.purpose-pg { background: #6d4bb3; }
 .purpose-badge.purpose-lease { background: #1f6fb2; }
