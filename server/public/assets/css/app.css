@@ -256,10 +256,19 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
 .property-card-title { line-height: 1.3; }
 .property-card-title a { text-decoration: none; }
 .property-card-title a:hover { text-decoration: underline; }
-.property-card-facts { color: #374151; }
 /* Four cards a row on wide screens: heart-only shortlist button so the
    actions stay on one line (the label stays for screen readers). */
 .property-card .btn { white-space: nowrap; }
+/* Card text in the filter panel's style: Inter at 14px in the dark ink
+   colour, semibold for labels, regular for values, no tight tracking. */
+.property-card .card-body { font-size: .875rem; color: var(--ink); letter-spacing: 0; }
+.property-card .card-body .small { font-size: .875rem; }
+.property-card-type { font-weight: 600; color: var(--ink); }
+.property-card-title { font-size: .95rem; font-weight: 600; letter-spacing: 0; }
+.property-card-place { color: var(--ink-soft); }
+.property-card-price { font-size: 1.05rem; font-weight: 600; color: var(--ink); letter-spacing: 0; }
+.property-card-price .per { font-size: .875rem; font-weight: 400; color: var(--ink-soft); }
+.property-card-facts { color: var(--ink); }
 .property-card .shortlist-btn .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .property-card .shortlist-btn .heart { font-size: 1rem; line-height: 1; }
 .shortlist-btn .heart { color: #c2410c; }
@@ -324,8 +333,8 @@ details.reschedule > summary::-webkit-details-marker { display: none; }
     .property-card .card-body { padding: .6rem !important; gap: .15rem !important; }
     .property-card .card-body .small { font-size: .75rem; }
     .property-card-title { font-size: .85rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .property-card .fs-5 { font-size: 1rem !important; }
-    .property-card .fs-5 .fs-6 { font-size: .7rem !important; }
+    .property-card-price { font-size: .95rem; }
+    .property-card-price .per { font-size: .75rem; }
     .property-card-facts { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .property-card .btn-primary { font-size: .8rem; padding: .3rem .4rem; }
     .property-card-tags { top: .35rem; left: .35rem; gap: .2rem; flex-wrap: wrap; max-width: calc(100% - 2.6rem); }
