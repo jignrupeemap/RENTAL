@@ -1,6 +1,7 @@
 <?php
 /**
- * Listing card (spec 49): photo, title, place, rent, three key facts,
+ * Listing card (spec 49): photo, type, place, rent, three key facts (no
+ * title: it repeated the BHK; the detail page shows it),
  * shortlist heart and Rent/PG/Lease tag on the photo, View Details. Kept short.
  * @var array $r  row from ListingRepository (with 'cover') @var bool $on  shortlisted @var string $return
  * @var bool $eager  first cards on the page load without lazy-loading
@@ -15,8 +16,7 @@ $area = $r['area_value'] !== null ? rtrim(rtrim((string) $r['area_value'], '0'),
 $facts = match (true) {
     $r['purpose'] === 'pg' => [$opt('pg_available_for', $r['pg_available_for']) ? 'For ' . $opt('pg_available_for', $r['pg_available_for']) : null,
         $opt('pg_suitable_for', $r['pg_suitable_for']), $opt('furnishing', $r['furnishing'])],
-    // Homes: the title already says the BHK, so no details line.
-    $r['field_profile'] === 'residential' => [],
+    $r['field_profile'] === 'residential' => [$opt('bedrooms', $r['bedrooms']), $r['bathrooms'] ? $r['bathrooms'] . ' Bath' : null, $opt('furnishing', $r['furnishing'])],
     default => [$area, $opt('furnishing', $r['furnishing'])],
 };
 $facts = array_values(array_filter($facts));
@@ -41,12 +41,11 @@ $facts = array_values(array_filter($facts));
     </div>
     <div class="card-body d-flex flex-column gap-1 p-3">
         <div class="small property-card-type"><?= e($r['type_name']) ?> · <?= e(purpose_label($r['purpose'])) ?></div>
-        <h3 class="h6 mb-0 property-card-title"><a class="text-reset" href="<?= e($href) ?>"><?= e($name) ?></a></h3>
         <div class="small property-card-place"><?= e($place) ?></div>
         <div class="property-card-price mt-1"><?= e(money_inr($r['rent'] !== null ? (int) $r['rent'] : null)) ?> <span class="per">/ month</span></div>
         <?php if ($facts): ?><div class="small property-card-facts"><?= e(implode(' | ', $facts)) ?></div><?php endif; ?>
         <div class="mt-auto pt-2">
-            <a class="btn btn-sm btn-primary w-100" href="<?= e($href) ?>">View Details</a>
+            <a class="btn btn-sm btn-primary w-100" href="<?= e($href) ?>" aria-label="View details: <?= e($name) ?>">View Details</a>
         </div>
     </div>
 </article>
