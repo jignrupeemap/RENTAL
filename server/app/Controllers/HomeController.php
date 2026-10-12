@@ -20,10 +20,16 @@ final class HomeController
     public function index(Request $request): Response
     {
         $listings = ListingRepository::homepage(12);
+        $siteName = (string) Settings::get('site_name', 'Homeforrent');
+        // What Google shows for the site: editable in Admin → Settings → General (migration 0009).
+        $description = trim((string) Settings::get('seo_home_description', ''))
+            ?: 'Find flats, houses, PG, shops and offices for rent or lease in Surat, Ankleshwar, Bharuch, Vapi and across Gujarat. Listed direct by owners. Search free.';
         return Response::html(View::render('public/home', [
-            'title'           => (string) Settings::get('site_name', 'Homeforrent'),
-            'metaDescription' => (string) Settings::get('site_tagline', '') ?: 'Rent, PG and lease properties listed directly by owners. Search by city, locality, type and budget.',
+            'title'           => trim((string) Settings::get('seo_home_title', '')) ?: 'Rent, PG & Lease in Surat, Ankleshwar, Bharuch, Vapi',
+            'metaDescription' => $description,
             'canonical'       => url('/'),
+            'og'              => ['type' => 'website', 'image' => url('assets/img/og-image.jpg')],
+            'jsonLd'          => self::jsonLd($siteName, $description),
             'slides'          => SliderService::live(),
             'cities'          => PropertyForm::cities(),
             'localities'      => PropertyForm::localities(),
@@ -74,5 +80,21 @@ final class HomeController
         return Config::isProduction()
             ? Response::json(['ok' => $ok], $ok ? 200 : 503)
             : Response::json(['ok' => $ok, 'checks' => $checks], $ok ? 200 : 503);
+    }
+
+    /** WebSite + Organization data so Google shows the site name and logo. */
+    private static function jsonLd(string $siteName, string $description): string
+    {
+        $org = array_filter([
+            '@type' => 'Organization', 'name' => $siteName, 'url' => url('/'),
+            'logo' => url('assets/img/icon-192.png'),
+            'email' => (string) Settings::get('support_email', '') ?: null,
+            'telephone' => (string) Settings::get('support_phone', '') ?: null,
+        ]);
+        $data = ['@context' => 'https://schema.org', '@graph' => [
+            ['@type' => 'WebSite', 'name' => $siteName, 'url' => url('/'), 'description' => $description, 'inLanguage' => 'en-IN'],
+            $org,
+        ]];
+        return (string) json_encode($data, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP);
     }
 }
