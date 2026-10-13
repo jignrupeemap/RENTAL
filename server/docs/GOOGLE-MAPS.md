@@ -11,10 +11,13 @@ Added 2026-10-11, after the 15 phases.
 - The coordinates box is what the server saves, so the form works the same with or without JavaScript.
 
 ## What visitors see (listing page, owner preview, admin view)
-A small map under **Location**, loaded only when it scrolls into view:
-- approximate privacy (default): a 500 m shaded circle around the public point, which is itself 150-400 m from the real spot, so the property is inside it without being pinpointed;
-- exact privacy: a pin.
-If the map can't load, the box is removed. If it loads but its tiles never arrive (a grey box), the browser console (F12) shows a "Listing map:" warning after 15 seconds.
+A **map picture** under Location (changed 2026-10-12, PR "area map picture"):
+- approximate privacy (default): the area, softly blurred, with a 500 m shaded circle around the public point (itself 150-400 m from the real spot);
+- exact privacy: a sharp picture with a dot.
+
+The picture is made **once per location** on the server from OpenStreetMap tiles (`app/Services/Media/AreaMapImage.php`) and saved as `public/uploads/maps/<hash>.jpg`, so it shows on every device with no Google key, billing or browser script. `deploy.sh` runs `php bin/map-images.php`, which makes any missing pictures; a page also makes its own picture on first view. If the tiles can't be downloaded (logged in `storage/logs`), that page shows the live Google map instead and the server tries again an hour later. Moving the pin or changing privacy gives a new picture. Credit "Map data © OpenStreetMap contributors" is shown under it, as OpenStreetMap requires.
+
+Why: on the live site some visitors' browsers showed the Google map as a grey box with only the circle (Google map tiles never loaded), which could not be reproduced with the same key elsewhere.
 
 **View on Google Maps** on the public page does not open Google Maps (added 2026-10-12): it shows "Contact/whatsapp on *support phone* for location and more detail", with call and WhatsApp links. The number is the **Support phone** in Admin → Settings → General (migration 0008 sets it to 9925133440 if it was empty). The owner's preview and the admin view keep the real Google Maps link.
 

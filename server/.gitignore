@@ -6,6 +6,7 @@
 !/storage/**/.gitkeep
 /public/uploads/properties/*
 /public/uploads/sliders/*
+/public/uploads/maps/*
 !/public/uploads/**/.gitkeep
 /backups/
 .DS_Store

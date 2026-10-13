@@ -30,6 +30,9 @@ echo "==> Database migrations"
 echo "==> Minified CSS/JS"
 "$PHP_BIN" bin/build-assets.php
 
+echo "==> Area map pictures for listings (OpenStreetMap)"
+"$PHP_BIN" bin/map-images.php || echo "Some map pictures could not be made; pages show the Google map for those until the next run."
+
 echo "==> Reloading PHP-FPM (clears OPcache)"
 sudo -n systemctl reload "$FPM_SERVICE"
 
