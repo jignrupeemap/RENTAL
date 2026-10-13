@@ -36,6 +36,11 @@ return [
     // https://www.example.com/*  (plus http://127.0.0.1:8088/* while testing).
     'GOOGLE_MAPS_BROWSER_KEY' => '',
 
+    // Map picture on listing pages, made once per listing from OpenStreetMap
+    // tiles and saved in public/uploads/maps. Leave '' for the standard
+    // OpenStreetMap server; only set it to use another tile server.
+    'MAP_TILE_URL' => '',
+
     // Email. MAIL_DRIVER: smtp (production) | log (development: written to storage/logs/mail-*.log)
     // SMTP details: hPanel → Emails → your mailbox → Configuration
     'MAIL_DRIVER'     => 'smtp',

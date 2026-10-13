@@ -114,7 +114,19 @@ $showStreet = !$public || ($loc['privacy'] ?? '') === 'exact';
         <br><?= e(implode(', ', array_filter([$place, $p['pincode']]))) ?>
     </address>
     <?php if ($loc): ?>
-        <?php if (($mapsKey = maps_browser_key()) !== ''): ?>
+        <?php
+        // A saved OpenStreetMap picture of the area (AreaMapImage) always shows;
+        // the live Google map is only the fallback while one can't be made.
+        $areaMap = App\Services\Media\AreaMapImage::url((float) $loc['public_latitude'], (float) $loc['public_longitude'], $loc['privacy'] === 'exact');
+        ?>
+        <?php if ($areaMap !== null): ?>
+            <figure class="mb-2">
+                <img class="w-100 rounded-3 bg-light" style="aspect-ratio:<?= App\Services\Media\AreaMapImage::WIDTH ?>/<?= App\Services\Media\AreaMapImage::HEIGHT ?>;object-fit:cover"
+                     src="<?= e(url($areaMap)) ?>" width="<?= App\Services\Media\AreaMapImage::WIDTH ?>" height="<?= App\Services\Media\AreaMapImage::HEIGHT ?>" loading="lazy"
+                     alt="<?= $loc['privacy'] === 'exact' ? 'Map of the property location' : 'Map of the area around the property' ?>">
+                <figcaption class="text-muted text-end" style="font-size:.7rem">Map data &copy; <a class="text-muted" href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</figcaption>
+            </figure>
+        <?php elseif (($mapsKey = maps_browser_key()) !== ''): ?>
             <div class="property-map property-map-sm mb-2" data-property-map data-maps-key="<?= e($mapsKey) ?>"
                  data-lat="<?= e((string) $loc['public_latitude']) ?>" data-lng="<?= e((string) $loc['public_longitude']) ?>"
                  data-exact="<?= $loc['privacy'] === 'exact' ? '1' : '0' ?>" role="region" aria-label="Map of the property area"></div>
